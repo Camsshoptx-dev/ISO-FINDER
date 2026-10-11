@@ -23,10 +23,12 @@ st.markdown(
 
 # Home page: shown until the visitor presses "Open the app" (adds ?app=1 to the address).
 if not st.query_params.get("app"):
-    if st.button("Open the app", type="primary", use_container_width=True):
+    def _go():
         st.query_params["app"] = "1"
-        st.rerun()
-    components.html((Path(__file__).parent / "landing.html").read_text(encoding="utf-8"), height=900, scrolling=True)
+
+    st.button("Open Iso Finder", type="primary", use_container_width=True, on_click=_go, key="go_top")
+    components.html((Path(__file__).parent / "landing.html").read_text(encoding="utf-8"), height=1500, scrolling=True)
+    st.button("Open Iso Finder", type="primary", use_container_width=True, on_click=_go, key="go_bottom")
     st.stop()
 
 

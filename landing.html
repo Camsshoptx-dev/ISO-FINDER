@@ -49,13 +49,13 @@ footer{padding:32px 0 48px;color:var(--mut);font-size:14px}
 </head>
 <body>
 <div class="wrap">
-<nav><a class="logo" href="#"><i></i>Iso Finder</a><a class="btn sm" href="#" data-go>Open the app</a></nav>
+<nav><a class="logo" href="#"><i></i>Iso Finder</a></nav>
 
 <header class="hero">
 <div>
 <h1>Snap the iso.<br><span>Find the pipe.</span></h1>
 <p>Take a photo of any piping isometric. Iso Finder reads the coordinates and tells you which floor, which North column and which East column the pipe is in, then gives you a checklist of everything on the line.</p>
-<div class="cta"><a class="btn" href="#" data-go>Try it now</a><a class="btn ghost" href="#how">How it works</a></div>
+<div class="cta"><a class="btn ghost" href="#how">How it works</a></div>
 </div>
 <div class="card mock" aria-hidden="true">
 <svg viewBox="0 0 300 375" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M40 90 L40 210 L130 260 L130 150 L230 205 L230 300" stroke="#f26a1b" stroke-width="5"/><circle cx="130" cy="150" r="16" stroke="#0b6b8a" stroke-width="3"/><circle cx="230" cy="205" r="16" stroke="#0b6b8a" stroke-width="3"/></svg>
@@ -84,7 +84,7 @@ footer{padding:32px 0 48px;color:var(--mut);font-size:14px}
 </section>
 
 <section>
-<div class="band"><h2>Ready to try it?</h2><p>Upload a photo of an iso and see where the pipe is in seconds.</p><a class="btn" href="#" data-go>Open Iso Finder</a></div>
+<div class="band"><h2>Ready to try it?</h2><p>Upload a photo of an iso and see where the pipe is in seconds.</p></div>
 </section>
 
 <section>
@@ -97,16 +97,6 @@ footer{padding:32px 0 48px;color:var(--mut);font-size:14px}
 
 <footer>© <span id="y"></span> Iso Finder. Not affiliated with any plant or employer. Verify all results against the issued drawing.</footer>
 </div>
-<script>
-document.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",e=>{
-  e.preventDefault();
-  try{window.parent.scrollTo({top:0,behavior:"smooth"})}catch(x){}
-}));
-document.querySelectorAll('a[href="#how"]').forEach(a=>a.addEventListener("click",e=>{
-  e.preventDefault();
-  document.getElementById("how").scrollIntoView({behavior:"smooth"});
-}));
-document.getElementById('y').textContent=new Date().getFullYear();
-</script>
+<script>document.getElementById('y').textContent=new Date().getFullYear()</script>
 </body>
 </html>
