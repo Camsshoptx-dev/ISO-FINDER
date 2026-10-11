@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Iso Finder – Find the pipe. Check the line.</title>
+<meta name="description" content="Snap a photo of a piping isometric. Iso Finder tells you which floor, which North column and which East column the pipe is in, and gives you a checklist and printable sheet for everything on the line.">
+<meta property="og:title" content="Iso Finder">
+<meta property="og:description" content="Photograph an iso. Know where the pipe is and what to check.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1f3f5;--pn:#fff;--ink:#10222f;--mut:#566774;--ln:#d6dde3;--acc:#f26a1b;--accink:#1d0d02;--pt:#0b6b8a;--dark:#0a1319}
+@media(prefers-color-scheme:dark){:root{--bg:#0a1319;--pn:#111d25;--ink:#e9f0f4;--mut:#8da0ac;--ln:#243843;--acc:#ff8240;--pt:#3bc9db;--dark:#05090c}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 Barlow,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Barlow Semi Condensed",Barlow,sans-serif;line-height:1.05;margin:0;letter-spacing:-.01em}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:16px 0}
+.logo{font:800 22px "Barlow Semi Condensed";display:flex;gap:8px;align-items:center;text-decoration:none;color:var(--ink)}
+.logo i{width:14px;height:14px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 25%,transparent)}
+.btn{display:inline-block;background:var(--acc);color:var(--accink);font-weight:600;text-decoration:none;padding:14px 24px;border-radius:12px;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px color-mix(in srgb,var(--acc) 40%,transparent)}
+.btn.sm{padding:9px 16px;font-size:15px}
+.ghost{background:none;color:var(--ink);border:1px solid var(--ln)}
+.hero{padding:48px 0 56px;display:grid;gap:36px;grid-template-columns:1fr;align-items:center}
+@media(min-width:820px){.hero{grid-template-columns:1.1fr .9fr;padding:72px 0}}
+.hero h1{font-size:clamp(44px,8vw,76px);font-weight:800}
+.hero h1 span{color:var(--acc)}
+.hero p{color:var(--mut);font-size:20px;margin:18px 0 28px;max-width:34em}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.card{background:var(--pn);border:1px solid var(--ln);border-radius:20px;padding:20px}
+.mock{position:relative;aspect-ratio:4/5;overflow:hidden;background:repeating-linear-gradient(0deg,transparent 0 31px,var(--ln) 31px 32px),repeating-linear-gradient(90deg,transparent 0 31px,var(--ln) 31px 32px),var(--pn)}
+.mock svg{position:absolute;inset:0;width:100%;height:100%}
+.tag{position:absolute;left:14px;right:14px;bottom:14px;background:var(--dark);color:#e9f0f4;border-radius:14px;padding:14px 16px;font-size:15px}
+.tag b{color:#ff8240;font-family:"Barlow Semi Condensed";font-size:20px;display:block}
+section{padding:48px 0}
+section h2{font-size:clamp(32px,5vw,46px);font-weight:700;margin-bottom:8px}
+.sub{color:var(--mut);margin:0 0 28px}
+.grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:700px){.grid.g3{grid-template-columns:repeat(3,1fr)}.grid.g2{grid-template-columns:repeat(2,1fr)}}
+.n{width:36px;height:36px;border-radius:50%;background:var(--acc);color:var(--accink);display:grid;place-items:center;font:700 18px "Barlow Semi Condensed";margin-bottom:12px}
+.card h3{font-size:24px;margin-bottom:6px}.card p{margin:0;color:var(--mut)}
+.band{background:var(--dark);color:#e9f0f4;border-radius:24px;padding:36px 24px;text-align:center}
+.band p{color:#8da0ac;margin:10px auto 22px;max-width:30em}
+details{border-bottom:1px solid var(--ln);padding:14px 0}summary{cursor:pointer;font-weight:600}details p{color:var(--mut);margin:8px 0 0}
+footer{padding:32px 0 48px;color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="logo" href="#"><i></i>Iso Finder</a><a class="btn sm" href="#" data-go>Open the app</a></nav>
+
+<header class="hero">
+<div>
+<h1>Snap the iso.<br><span>Find the pipe.</span></h1>
+<p>Take a photo of any piping isometric. Iso Finder reads the coordinates and tells you which floor, which North column and which East column the pipe is in, then gives you a checklist of everything on the line.</p>
+<div class="cta"><a class="btn" href="#" data-go>Try it now</a><a class="btn ghost" href="#how">How it works</a></div>
+</div>
+<div class="card mock" aria-hidden="true">
+<svg viewBox="0 0 300 375" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M40 90 L40 210 L130 260 L130 150 L230 205 L230 300" stroke="#f26a1b" stroke-width="5"/><circle cx="130" cy="150" r="16" stroke="#0b6b8a" stroke-width="3"/><circle cx="230" cy="205" r="16" stroke="#0b6b8a" stroke-width="3"/></svg>
+<div class="tag"><b>Level 3 · North 12,500 · East 70,100</b>Go up one floor, then look for the beam tagged N 12,500.</div>
+</div>
+</header>
+
+<section id="how">
+<h2>Three steps. No plant experience needed.</h2>
+<p class="sub">Built for the new guy on the crew.</p>
+<div class="grid g3">
+<div class="card"><div class="n">1</div><h3>Photo</h3><p>Take a straight, close picture of the iso. It reads the page on its own.</p></div>
+<div class="card"><div class="n">2</div><h3>Find</h3><p>See the floor and the North and East columns in plain words, with a map. Type the beam you're standing by and it tells you which way to walk.</p></div>
+<div class="card"><div class="n">3</div><h3>Check</h3><p>Tick off every pipe, elbow, tee, valve, flange, gasket, bolt and tag on the line.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Take it to the field</h2>
+<div class="grid g2">
+<div class="card"><h3>Printable check sheet</h3><p>One PDF with where the pipe is, the drawing with every item circled, and the full checklist.</p></div>
+<div class="card"><h3>Works on your phone</h3><p>Open it in the browser. Nothing to install. Your checks are saved on the device.</p></div>
+<div class="card"><h3>Cut lengths and supports</h3><p>J1, J2 tags, supports, welds and cut lengths pulled off the drawing and explained.</p></div>
+<div class="card"><h3>Always verify</h3><p>It reads the drawing for you, but it can miss. Confirm against the iso before you cut or install.</p></div>
+</div>
+</section>
+
+<section>
+<div class="band"><h2>Ready to try it?</h2><p>Upload a photo of an iso and see where the pipe is in seconds.</p><a class="btn" href="#" data-go>Open Iso Finder</a></div>
+</section>
+
+<section>
+<h2>Questions</h2>
+<details><summary>What do I need to take a good photo?</summary><p>Hold the phone square to the page, get close enough to read the small print, and avoid shadows.</p></details>
+<details><summary>How are floors worked out?</summary><p>Floors are 20 ft apart starting at 100 ft, so Level 1 is 100 to 120 ft. North and East columns are every 100 ft.</p></details>
+<details><summary>Is it always right?</summary><p>No. It is a helper, not a replacement for the drawing. Check what it tells you.</p></details>
+<details><summary>Does it cost anything?</summary><p>The public version has a daily limit on reads. Ask about an access code.</p></details>
+</section>
+
+<footer>© <span id="y"></span> Iso Finder. Not affiliated with any plant or employer. Verify all results against the issued drawing.</footer>
+</div>
+<script>document.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();try{window.parent.location.search="?app=1"}catch(x){window.top.location.search="?app=1"}}));document.getElementById('y').textContent=new Date().getFullYear()</script>
+</body>
+</html>

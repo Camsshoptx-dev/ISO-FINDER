@@ -1,0 +1,952 @@
+<title>Iso Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: phone-first field tool. Slim step bar on top, the drawing fills the middle, a bottom sheet holds the current step.
+   Orange is reserved for the main action and for what is highlighted on the drawing. Selection elsewhere is navy. */
+:root{--disp:"Barlow Semi Condensed","Barlow",system-ui,sans-serif;--font:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+ --bg:#f1f3f5;--stage:#d3dae0;--pn:#ffffff;--ink:#10222f;--mut:#566774;--ln:#d6dde3;--ln2:#e8edf1;--acc:#f26a1b;--accink:#1d0d02;--pt:#0b6b8a;--sel:#10222f;--selink:#ffffff;--ok:#1f7a3a;--warn:#a84e07;--bad:#c0272d;--r:10px}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1319;--stage:#05090c;--pn:#111d25;--ink:#e9f0f4;--mut:#8da0ac;--ln:#243843;--ln2:#182832;--acc:#ff8240;--pt:#3bc9db;--sel:#e9f0f4;--selink:#0a1319;--ok:#5fd07a;--warn:#f0b04a;--bad:#ff8a8a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1319;--stage:#05090c;--pn:#111d25;--ink:#e9f0f4;--mut:#8da0ac;--ln:#243843;--ln2:#182832;--acc:#ff8240;--pt:#3bc9db;--sel:#e9f0f4;--selink:#0a1319;--ok:#5fd07a;--warn:#f0b04a;--bad:#ff8a8a;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font);display:flex;flex-direction:column}
+button,input,select{font:inherit;color:var(--ink)}
+button{cursor:pointer;border:1px solid var(--ln);background:var(--pn);border-radius:var(--r);min-height:44px;padding:8px 14px;font-weight:500}
+button:active{transform:scale(.98)}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--pt);outline-offset:2px}
+input,select{background:var(--bg);border:1px solid var(--ln);border-radius:var(--r);padding:10px 12px;min-height:44px;width:100%;min-width:0}
+input.mono,#nsp,#esp{font-family:var(--mono);font-size:14px}
+.pri{background:var(--acc);border-color:var(--acc);color:var(--accink);font-weight:600;min-height:48px;width:100%;font-size:16px}
+.ghost{background:transparent;width:100%}
+button.on{background:var(--sel);border-color:var(--sel);color:var(--selink);font-weight:600}
+
+#top{display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--pn);border-bottom:1px solid var(--ln)}
+.steps{flex:1;min-width:0;display:flex;gap:2px;padding:3px;background:var(--ln2);border-radius:12px}
+.steps button{flex:1;min-width:0;min-height:40px;display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 6px;border:0;background:transparent;border-radius:9px;color:var(--mut);font-size:14px}
+.steps button.on{background:var(--pn);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.steps i{pointer-events:none;font-style:normal;flex:none;width:20px;height:20px;border-radius:50%;background:var(--ln);color:var(--mut);display:grid;place-items:center;font-size:12px;font-weight:600}
+.steps button.on i{background:var(--acc);color:var(--accink)}
+.steps button.done i{background:var(--ok);color:#fff}
+#help{flex:none;width:44px;padding:0;border:0;background:var(--ln2);border-radius:12px;font-weight:600;color:var(--mut)}
+
+#stage{flex:1;min-height:0;position:relative}
+#view{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--stage)}
+canvas{display:none}
+#empty{margin:24px 16px;padding:28px 20px 22px;background:var(--pn);border:1px solid var(--ln);border-radius:14px;text-align:center}
+#empty svg{display:block;margin:0 auto 14px;width:96px;height:auto;color:var(--pt)}
+#empty b{display:block;font-size:18px;font-weight:600;margin-bottom:4px}
+#empty p{margin:0 0 18px;color:var(--mut);font-size:14px}
+#fc{position:absolute;right:10px;top:10px;z-index:3;display:flex;flex-direction:column;background:var(--pn);border:1px solid var(--ln);border-radius:12px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.2)}
+#fc button{width:44px;height:44px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;font-size:20px;font-weight:400}
+#fc button+button{border-top:1px solid var(--ln2)}
+#fc .fit{font-size:12px;font-weight:600}
+
+#dock{background:var(--pn);border-top:1px solid var(--ln);border-radius:18px 18px 0 0;box-shadow:0 -2px 12px rgba(0,0,0,.08);max-height:56%;overflow:auto;padding:0 16px 16px}
+#grab{display:block;margin:0;width:100%;height:26px;min-height:0;padding:0;border:0;border-radius:0;background:var(--pn);position:sticky;top:0;z-index:2}
+#grab::after{content:"";display:block;width:40px;height:4px;border-radius:2px;background:var(--ln);margin:10px auto 0}
+#dock.min .sec{display:none!important}
+#banner{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--r);background:var(--ln2);font-size:14px;font-weight:500;margin:0 0 14px}
+#banner::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--pt)}
+#banner[data-kind="ok"]::before{background:var(--ok)}
+#banner[data-kind="warn"]::before{background:var(--warn)}
+#banner[data-kind="bad"]::before{background:var(--bad)}
+.sec{display:none}.sec.on{display:block}
+.lbl{display:block;font-size:13px;font-weight:500;color:var(--mut);margin:16px 0 6px}
+.hint{color:var(--mut);font-size:13px;margin:8px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stack{display:grid;grid-template-columns:1fr}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{min-height:40px;padding:6px 14px;font-size:14px}
+.row{display:flex;gap:8px;margin-top:12px}.row>*{flex:1;min-width:0}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 12px}
+.strip button{flex:0 0 auto;min-width:44px;padding:6px 8px;font-family:var(--mono);font-weight:500}
+.strip button.warn{border-style:dashed;border-color:var(--warn)}
+.strip button.err{border-color:var(--bad);color:var(--bad)}
+.strip button.on{color:var(--selink)}
+.card{border:1px solid var(--ln);border-radius:12px;padding:14px}
+.chead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.chead h3{margin:0;font-size:16px;font-weight:600}
+.sub{font-size:13px;color:var(--mut)}
+.tag{flex:none;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid currentColor}
+.tag[data-s=ok]{color:var(--ok)}.tag[data-s=warn]{color:var(--warn)}.tag[data-s=bad]{color:var(--bad)}
+.readout{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;margin:12px 0 4px;background:var(--ln);border:1px solid var(--ln);border-radius:var(--r);overflow:hidden}
+.readout div{background:var(--bg);padding:8px 12px;min-width:0;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.readout .k{font-size:13px;color:var(--mut)}
+.readout .v{font-family:var(--mono);font-size:14px;font-weight:500;text-align:right;overflow-wrap:anywhere}
+.msg,.bad,.ok{position:relative;margin:0 0 8px;padding-left:18px;font-size:14px}
+.msg::before,.bad::before,.ok::before{content:"";position:absolute;left:2px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--pt)}
+.bad::before{background:var(--bad)}.ok::before{background:var(--ok)}
+.bad{color:var(--bad)}.ok{color:var(--ok);font-weight:500}
+details{margin-top:6px}
+summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-weight:500;font-size:14px;border-top:1px solid var(--ln2)}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";width:7px;height:7px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(45deg);margin-right:4px;transition:transform .15s}
+details[open]>summary::after{transform:rotate(-135deg)}
+#autost,#vst{display:grid;gap:10px;margin:14px 0}
+.tips{margin:0 0 8px;padding-left:20px;font-size:14px;color:var(--mut)}.tips li{margin:6px 0}
+.astat{display:flex;align-items:center;gap:10px}
+.astat span{flex:1;font-size:14px;font-weight:500}
+.astat button{flex:none;min-height:40px}
+.bar{height:4px;border-radius:2px;background:var(--ln2);overflow:hidden;position:relative}
+.bar i{position:absolute;top:0;bottom:0;left:-35%;width:35%;background:var(--acc);border-radius:2px;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{to{left:100%}}
+@media(prefers-reduced-motion:reduce){.bar i{animation:none;left:0;width:100%;opacity:.5}}
+#where{margin:10px 0 2px}
+#where .wl{font-size:13px;color:var(--mut);margin:0 0 8px}
+#where .wr{display:grid;grid-template-columns:76px 1fr;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--ln2)}
+#where .wk{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);padding-top:3px}
+#where .wv{font-size:17px;font-weight:600;line-height:1.3}
+#where .ws{font-size:13px;color:var(--mut);margin-top:2px;font-family:var(--mono)}
+#where .wt{background:var(--ln2);border-radius:var(--r);padding:10px 12px;font-size:14px;margin:6px 0 10px}
+#where svg{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--ln);border-radius:var(--r)}
+#where .cap{font-size:12px;color:var(--mut);margin:4px 0 12px}
+#where .runs{font-family:var(--mono);font-size:12px;color:var(--mut);margin:0;padding-left:0;list-style:none}
+#where .runs li{padding:3px 0;border-top:1px solid var(--ln2)}
+button{transition:background-color .15s,border-color .15s,transform .1s,box-shadow .15s}
+@media(hover:hover){button:not(:disabled):hover{border-color:var(--pt)}.pri:not(:disabled):hover{filter:brightness(1.06);border-color:var(--acc)}}
+.sec.on{animation:rise .22s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.sec.on{animation:none}}
+.filt{border:1px solid var(--ln);border-radius:12px;padding:4px 10px;margin:2px 0 4px}
+.frow{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;align-items:center;padding:4px 0}
+.frow+.frow{border-top:1px solid var(--ln2)}
+.frow>span{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.filt .chips{flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none}.filt .chips::-webkit-scrollbar{display:none}
+.filt .chips button{flex:none;white-space:nowrap;min-height:36px;padding:4px 12px;font-size:13px;border-radius:999px}
+#fst{font-size:14px;font-weight:500;color:var(--mut);margin:10px 0 0}
+#where{margin:4px 0 2px}
+#helpbox{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;z-index:9}
+#helpbox.open{display:flex}
+#helpbox .sheet{background:var(--pn);width:100%;border-radius:18px 18px 0 0;padding:20px 16px;max-height:85%;overflow:auto}
+#helpbox h2{margin:0 0 10px;font-size:18px;font-weight:600}
+#helpbox ol{padding-left:20px;margin:0 0 12px}#helpbox li{margin:10px 0}
+
+/* ---- look: dark workbench, paper drawing, frosted sheet ---- */
+:root{--bg:#edf1f5;--stage:#0d1720;--ink:#0b1a25;--mut:#587080;--ln:#d3dce4;--ln2:#e6ecf1;--acc:#ff6a13;--accink:#190a00;--pt:#1558e8;--sel:#0b1a25;--sheet:rgba(255,255,255,.86);--r:14px}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b141b;--pn:#111e28;--ink:#e8eff4;--mut:#8ea3b0;--ln:#25384550;--ln:#263a47;--ln2:#182833;--acc:#ff7a2e;--pt:#6aa6ff;--sel:#e8eff4;--selink:#0b141b;--sheet:rgba(14,24,32,.88)}}
+:root[data-theme="dark"]{--bg:#0b141b;--pn:#111e28;--ink:#e8eff4;--mut:#8ea3b0;--ln:#263a47;--ln2:#182833;--acc:#ff7a2e;--pt:#6aa6ff;--sel:#e8eff4;--selink:#0b141b;--sheet:rgba(14,24,32,.88)}
+body{background:#0b141b;letter-spacing:.005em}
+h1,h2,h3,.pri,.steps button,#where .tv,#where .wl,#empty b{font-family:var(--disp)}
+#top{background:#0b141b;border-bottom:1px solid #16242e;padding:10px 14px}
+.steps{background:rgba(255,255,255,.07);border-radius:999px;padding:4px}
+.steps button{color:#93a8b6;border-radius:999px;font-size:15px;font-weight:600;letter-spacing:.01em;min-height:40px}
+.steps button.on{background:#f3f7fa;color:#0b1a25;box-shadow:none}
+.steps i{background:rgba(255,255,255,.12);color:#c7d5de;font-family:var(--mono);font-weight:500}
+.steps button.on i{background:var(--acc);color:#190a00}
+#help{background:rgba(255,255,255,.07);color:#c7d5de;border-radius:999px;width:44px;height:44px}
+#view{background:radial-gradient(rgba(255,255,255,.09) 1px,transparent 1.3px) 0 0/20px 20px,var(--stage)}
+#fc{background:rgba(13,23,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:16px;box-shadow:none}
+#fc button{color:#e8eff4}#fc button+button{border-top-color:rgba(255,255,255,.1)}
+#empty{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#e8eff4;border-radius:22px;backdrop-filter:blur(8px)}
+#empty p{color:#9db1be}#empty svg{color:var(--acc)}#empty b{font-size:24px;font-weight:600;letter-spacing:.005em}
+#dock{background:var(--sheet);-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);border-top:1px solid rgba(255,255,255,.4);border-radius:28px 28px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.4)}
+#grab{background:transparent}
+#grab::after{background:var(--mut);opacity:.35;width:36px}
+button{border-radius:var(--r);border-color:var(--ln);background:var(--pn)}
+.pri{border-radius:16px;font-size:18px;font-weight:700;letter-spacing:.01em;box-shadow:0 10px 24px -10px rgba(255,106,19,.75)}
+.ghost{border-color:var(--ln)}
+button.on{background:var(--sel);border-color:var(--sel)}
+#banner{background:transparent;border:1px solid var(--ln);border-radius:14px}
+.filt{border-radius:16px;background:transparent}
+.frow>span{text-transform:none;letter-spacing:0;font-size:13px;font-weight:600}
+.filt .chips button.on{background:var(--acc);border-color:var(--acc);color:var(--accink)}
+.card,.readout{border-radius:16px}
+.readout .v{font-size:15px}
+#where .wl{font-size:15px;font-weight:600;color:var(--ink);margin:12px 0 8px}
+#where .tiles{display:grid;grid-template-columns:.8fr 1.1fr 1.1fr;gap:8px}
+#where .tile{background:var(--bg);border:1px solid var(--ln);border-radius:16px;padding:12px 10px 10px;min-width:0}
+#where .tk{font-size:13px;font-weight:600;color:var(--mut)}
+#where .tv{font-size:21px;line-height:1.05;font-weight:700;margin:4px 0 6px;letter-spacing:.005em;overflow-wrap:anywhere}
+#where .ts{font-family:var(--mono);font-size:10.5px;line-height:1.35;color:var(--mut);overflow-wrap:anywhere}
+#where .tile:first-child{background:var(--sel);border-color:var(--sel)}
+#where .tile:first-child .tk,#where .tile:first-child .ts{color:var(--selink);opacity:.72}
+#where .tile:first-child .tv{color:var(--selink)}
+#where .wt{background:transparent;border:1px dashed var(--ln);border-radius:14px;margin:10px 0}
+#where svg{border-radius:16px}
+summary{font-weight:600}
+
+#check .cp{margin:4px 0 12px}
+#check .cl{font-family:var(--disp);font-size:24px;font-weight:700;line-height:1.1}
+#check .cs{font-size:13px;color:var(--mut);margin-top:2px;overflow-wrap:anywhere}
+#check .meter{height:8px;border-radius:99px;background:var(--ln2);overflow:hidden;margin:10px 0 0}
+#check .meter i{display:block;height:100%;width:0;background:var(--ok);border-radius:99px;transition:width .25s}
+#check .tools{display:flex;gap:8px;margin:12px 0 4px}#check .tools button{flex:1;min-height:40px;font-size:14px;padding:6px 8px}
+#check details{margin-top:10px}
+#check summary{border-top:0;padding:8px 2px;font-family:var(--disp);font-size:18px;font-weight:600}
+#check summary .n{margin-left:auto;margin-right:10px;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--mut)}
+.ci{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:start;padding:12px 10px;margin:0 0 6px;border:1px solid var(--ln);border-radius:14px;background:var(--bg);cursor:pointer;transition:opacity .2s,background-color .2s}
+.ci input{appearance:none;-webkit-appearance:none;width:28px;height:28px;min-height:0;padding:0;margin:0;border:2px solid var(--mut);border-radius:9px;background:transparent;display:grid;place-items:center;cursor:pointer}
+.ci input:checked{background:var(--ok);border-color:var(--ok)}
+.ci input:checked::after{content:"";width:7px;height:13px;border:solid #fff;border-width:0 3px 3px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.ci .ct{font-size:15px;line-height:1.3;overflow-wrap:anywhere}.ci .ct b{font-family:var(--mono);font-size:14px;font-weight:500;margin-right:6px}
+.gh{font-size:13px;color:var(--mut);margin:0 2px 8px}
+.ci .cm{font-size:12.5px;color:var(--mut);margin-top:3px;font-family:var(--mono)}
+.ci.done{opacity:.5}.ci.done .ct{text-decoration:line-through}
+.addrow{display:flex;gap:8px;margin-top:14px}.addrow input{flex:1}.addrow button{flex:none}
+#cbusy{display:grid;gap:10px;margin:6px 0 12px}
+
+.me{border:1px solid var(--ln);border-radius:16px;padding:12px 12px 8px;margin:14px 0;background:var(--bg)}
+.me .mt{font-family:var(--disp);font-size:19px;font-weight:700;line-height:1.1}
+.me .ms{font-size:13px;color:var(--mut);margin:3px 0 0}
+.me .megrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.me .megrid .lbl{margin:10px 0 4px;font-size:12.5px}
+.me input{min-height:44px;font-family:var(--mono);font-size:15px;padding:8px 10px}
+.me .verdict{font-family:var(--disp);font-size:21px;font-weight:700;line-height:1.2;margin:14px 0 8px}
+.me .verdict.ok{color:var(--ok)}
+.me .tiles{margin:6px 0 4px;grid-template-columns:repeat(3,minmax(0,1fr))}.me .tile .tv{font-size:16px;line-height:1.15}
+#where .me .tile:first-child{background:var(--bg);border-color:var(--ln)}#where .me .tile:first-child .tk,#where .me .tile:first-child .ts{color:var(--mut);opacity:1}#where .me .tile:first-child .tv{color:var(--ink)}
+.me .tile.in{background:transparent;border-style:dashed}
+.me .ends{font-family:var(--mono);font-size:12px;color:var(--mut);margin:8px 0 4px;padding:0;list-style:none}.me .ends li{padding:4px 0;border-top:1px solid var(--ln2)}
+</style>
+<header id="top">
+  <div class="steps" role="tablist" aria-label="Steps">
+    <button data-t="photo" class="on" role="tab"><i>1</i>Photo</button>
+    <button data-t="trace" role="tab" hidden><i>&bull;</i>Trace</button>
+    <button data-t="find" role="tab"><i>2</i>Find</button>
+    <button data-t="check" role="tab"><i>3</i>Check</button>
+  </div>
+  <button id="help" aria-label="How to use">?</button>
+</header>
+<div id="stage">
+  <div id="view">
+    <div id="empty">
+      <svg viewBox="0 0 96 72" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 50 L42 34 L42 12 L70 28 L70 52 L84 60"/><circle cx="14" cy="50" r="3.5" fill="currentColor" stroke="none"/><circle cx="42" cy="34" r="3.5" fill="currentColor" stroke="none"/><circle cx="42" cy="12" r="3.5" fill="currentColor" stroke="none"/><circle cx="70" cy="28" r="3.5" fill="currentColor" stroke="none"/><circle cx="70" cy="52" r="3.5" fill="currentColor" stroke="none"/><circle cx="84" cy="60" r="3.5" fill="currentColor" stroke="none"/></svg>
+      <b>Start with your iso</b>
+      <p>Take a photo of the drawing, or pick one from your library.</p>
+      <button id="pick" class="pri">Choose iso photo</button>
+    </div>
+    <canvas id="cv"></canvas>
+  </div>
+  <div id="fc" hidden><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zf" class="fit" aria-label="Fit to screen">Fit</button></div>
+</div>
+<section id="dock">
+  <button id="grab" aria-label="Show or hide panel"></button>
+  <div id="banner" data-kind="info"></div>
+
+  <div class="sec on" id="photo">
+    <button class="pri" id="auto" hidden disabled>Read the iso for me</button>
+    <p class="hint" id="autonote">Checking whether Claude can read the photo…</p>
+    <div id="autost" hidden><div class="bar"><i></i></div><div class="astat"><span id="autotxt"></span><button id="stop">Stop</button></div></div>
+    <details id="tips"><summary>Tips for a clear photo</summary>
+      <ul class="tips">
+        <li>Lay the iso flat and shoot straight down, so the page edges are square in the photo.</li>
+        <li>Fill the frame with the pipe drawing. Tiny numbers need pixels, so get close enough that the drawing covers most of the photo.</li>
+        <li>Use bright, even light. Keep your shadow and glare off the page.</li>
+        <li>Take a real photo, or use Scan Documents and pick the saved scan. A screenshot of a camera preview is too small.</li>
+        <li>Tap the drawing on your screen to focus before you shoot.</li>
+      </ul>
+    </details>
+    <details id="manual"><summary>Set up by hand</summary>
+      <label class="lbl">Turn the photo upright</label>
+      <div class="grid3"><button id="rl">↺ Left</button><button id="rr">↻ Right</button><button id="pick2">New photo</button></div>
+      <label class="lbl">On the iso, North points…</label>
+      <div class="grid2" id="nchips"></div>
+      <p class="hint">Find the N arrow on the iso. East is set for you.</p>
+    </details>
+    <div class="row"><button id="to2" class="ghost">Go to trace</button></div>
+  </div>
+
+  <div class="sec" id="trace">
+    <p class="hint" id="anote" hidden></p>
+    <div id="tst"></div>
+    <div class="row" id="chkrow" hidden><button id="chk">Ask Claude to check the numbers again</button></div>
+    <div id="vst" hidden><div class="bar"><i></i></div><div class="astat"><span id="vtxt"></span><button id="vstop">Stop</button></div></div>
+    <div class="strip" id="strip"></div>
+    <div id="card"></div>
+    <div class="row"><button id="undo">Undo last point</button><button id="clr">Start over</button></div>
+    <div class="row"><button class="ghost" id="to3">Show me where it is</button></div>
+  </div>
+
+  <div class="sec" id="find">
+    <div class="filt" role="group" aria-label="Narrow the area">
+      <div class="frow"><span>Floor</span><div class="chips" id="lchips"></div></div>
+      <div class="frow"><span>North</span><div class="chips" id="nchipsF"></div></div>
+      <div class="frow"><span>East</span><div class="chips" id="echips"></div></div>
+    </div>
+    <div id="fbusy" class="hint" hidden><div class="bar"><i></i></div><span id="fbtxt">Working…</span></div>
+    <p class="hint" id="fnote" hidden></p>
+    <div id="fst"></div>
+    <div id="where"></div>
+    <div class="row" id="pdfrow" hidden><button id="pdf1" class="ghost">Save PDF to print</button></div>
+    <div class="row" id="tocrow" hidden><button id="tocheck" class="pri"></button></div>
+    <div class="row" id="trrow" hidden><button id="totrace" class="ghost">Trace the full route (optional)</button></div>
+    <div class="row"><button id="copyloc">Copy location</button></div>
+    <details id="areaset"><summary>Column sizes and box size</summary>
+      <p class="hint">Levels are fixed: every floor is 20' tall and Level 1 starts at 100'.</p>
+      <div class="row"><div><label class="lbl" for="nsp">North column (ft)</label><input id="nsp" type="number" inputmode="decimal"></div><div><label class="lbl" for="esp">East column (ft)</label><input id="esp" type="number" inputmode="decimal"></div></div>
+      <label class="lbl" for="pad">Box size: <span id="padv"></span></label>
+      <input id="pad" type="range" min="5" max="150" style="padding:0">
+    </details>
+  </div>
+
+  <div class="sec" id="check">
+    <div id="cbusy" hidden><div class="bar"><i></i></div><div class="astat"><span>Reading the lists on the sheet…</span><button id="cstop">Stop</button></div></div>
+    <div id="checkbody"></div>
+  </div>
+</section>
+<div id="helpbox"><div class="sheet" role="dialog" aria-label="How to use">
+  <h2>How it works</h2>
+  <ol>
+    <li><b>Photo.</b> Load a clear photo of the whole sheet and tap <b>Read the iso for me</b>. Claude reads the coordinates printed at the pipe ends, then the material lists and the circled numbers and tags on the drawing.</li>
+    <li><b>Find.</b> You get the floor and the North and East columns in plain words, with the spots on the drawing marked. Type the N and E of the column you are standing by and it tells you which way to walk. Trace the full route only if you want to narrow it down by floor or column.</li>
+    <li><b>Check.</b> Walk the line and tick off the pipe, elbows, tees, valves, flanges, gaskets, bolts, tags like J1 and J2, supports, welds and cut lengths. Each item has a plain-English name. Your ticks are saved on this phone.</li>
+  </ol>
+  <p class="hint">Zoom in before you tap for better aim. Red messages mean a length or coordinate doesn't add up.</p>
+  <button class="pri" id="hclose">Got it</button>
+</div></div>
+<input id="file" type="file" accept="image/*" hidden>
+<script>
+const $=s=>document.querySelector(s),cv=$('#cv'),cx=cv.getContext('2d'),view=$('#view');
+const KEY='isofinder2';
+const LEVEL_BASE=100,LEVEL_H=20; // feet: Level 1 = 100' to 120', Level 2 = 120' to 140', and so on
+let S={rot:0,north:'UL',nodes:[],notes:[],list:null,me:null,hideDone:false,lv:'',nsp:100,esp:100,pad:30,seen:false};
+let img=null,zoom=1,tab='photo',sel=null,replacing=null,R=null,G={lvl:null,nb:null,eb:null};
+let sampleFn=null,readCtl=null,LAST=null,anote='',clrArm=0,LASTIMGS=null,MAXIMG=1;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&Array.isArray(d.nodes))S=Object.assign(S,d)}catch(e){}}
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+
+/* ---------- feet-inches parsing and printing ---------- */
+// 12490'7.7/8"  12490'-7 7/8"  179'6 7/16  5.1/2"  5'1"  124907.875 (plain = inches)
+function dim(s){s=String(s==null?'':s).trim().replace(/[”″"“]/g,'').replace(/[‘’′]/g,"'").replace(/^\+/,'');if(!s)return NaN;
+ let ft=0,neg=false;const m=s.match(/^(-?)(\d+(?:\.\d+)?)\s*'\s*-?\s*(.*)$/);
+ if(m){neg=!!m[1];ft=parseFloat(m[2])*12;s=m[3].trim()||'0'}else if(s[0]==='-'){neg=true;s=s.slice(1)}
+ s=s.replace(/(\d)[-.](?=\d+\/)/g,'$1 ').trim();let t=ft;
+ for(const p of s.split(/\s+/)){if(p.includes('/')){const[a,b]=p.split('/').map(Number);if(!b||isNaN(a))return NaN;t+=a/b}else{const v=Number(p);if(isNaN(v))return NaN;t+=v}}
+ return neg?-t:t}
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+function fmtIn(x){const neg=x<0,ts=Math.round(Math.abs(x)*16),w=Math.floor(ts/16),f=ts%16;let o='';if(f){const g=gcd(f,16);o=(f/g)+'/'+(16/g)}
+ const body=w?(w+(o?' '+o:'')):(o||'0');return(neg?'-':'')+body+'"'}
+function fmtFI(x){const neg=x<0,ts=Math.round(Math.abs(x)*16),ft=Math.floor(ts/192),rem=(ts%192)/16;if(!ft)return fmtIn(neg?-rem:rem);return(neg?'-':'')+ft+"'-"+fmtIn(rem)}
+function ftLab(x){return Math.abs(x/12-Math.round(x/12))<1e-6?Math.round(x/12)+"'":fmtFI(x)}
+
+/* ---------- iso directions ---------- */
+const CYC=['UL','UR','DR','DL'],V={UL:[-.866,-.5],UR:[.866,-.5],DR:[.866,.5],DL:[-.866,.5]},OPP={UL:'DR',UR:'DL',DR:'UL',DL:'UR'};
+const DIRS=['E+','E-','N+','N-','U','D'],NAME={'E+':'East','E-':'West','N+':'North','N-':'South','U':'Up','D':'Down'};
+function dvec(d){const nd=S.north,ed=CYC[(CYC.indexOf(nd)+1)%4];return d==='U'?[0,-1]:d==='D'?[0,1]:d==='N+'?V[nd]:d==='N-'?V[OPP[nd]]:d==='E+'?V[ed]:V[OPP[ed]]}
+function autoDir(a,b){if(b.hint)return dirFromVec(b.hint[0],b.hint[1]);let dx=b.u-a.u,dy=b.v-a.v;const m=Math.hypot(dx,dy)||1;dx/=m;dy/=m;let best='U',bs=-9;for(const d of DIRS){const v=dvec(d),s=v[0]*dx+v[1]*dy;if(s>bs){bs=s;best=d}}return best}
+const GO={UP:[0,-1],DOWN:[0,1],UL:[-.866,-.5],UR:[.866,-.5],DL:[-.866,.5],DR:[.866,.5]};
+function dirFromVec(dx,dy){let best='U',bs=-9;for(const d of DIRS){const v=dvec(d),sc=v[0]*dx+v[1]*dy;if(sc>bs){bs=sc;best=d}}return best}
+function arrow(d){const v=dvec(d);return v[0]===0?(v[1]<0?'↑':'↓'):(v[0]<0?(v[1]<0?'↖':'↙'):(v[1]<0?'↗':'↘'))}
+function flipDir(d){return{'E+':'E-','E-':'E+','N+':'N-','N-':'N+','U':'D','D':'U'}[d]}
+
+/* ---------- coordinate solver ---------- */
+function solve(){
+ const N=S.nodes,n=N.length,AX=['E','N','Z'];
+ const edge=N.map(nd=>{if(nd.parent<0||nd.parent>=n)return null;const d=nd.dir,ax=d[0]==='E'?'E':d[0]==='N'?'N':'Z',sg=(d==='E-'||d==='N-'||d==='D')?-1:1;const L=String(nd.len||'').trim()===''?NaN:dim(nd.len);return{p:nd.parent,ax,sg,L:isFinite(L)?Math.abs(L):null}});
+ const val={E:Array(n).fill(null),N:Array(n).fill(null),Z:Array(n).fill(null)},solved=Array(n).fill(null);
+ N.forEach((nd,i)=>AX.forEach(a=>{const x=dim(nd[a]);if(isFinite(x))val[a][i]=x}));
+ const dl=(i,a)=>{const e=edge[i];if(!e)return null;if(e.ax!==a)return 0;if(e.L!=null)return e.sg*e.L;return solved[i]};
+ for(let pass=0;pass<3*n+6;pass++){let ch=false;
+  for(let i=0;i<n;i++){const e=edge[i];if(!e)continue;
+   for(const a of AX){const v=val[a],dp=v[e.p],dc=v[i],d=dl(i,a);
+    if(dp!=null&&d!=null&&dc==null){v[i]=dp+d;ch=true}
+    else if(dc!=null&&d!=null&&dp==null){v[e.p]=dc-d;ch=true}
+    else if(dp!=null&&dc!=null&&d==null&&a===e.ax){solved[i]=dc-dp;ch=true}}}
+  if(!ch)break}
+ const issues=[];
+ for(let i=0;i<n;i++){const e=edge[i];if(!e)continue;
+  for(const a of AX){const d=dl(i,a),dp=val[a][e.p],dc=val[a][i];if(dp!=null&&dc!=null&&d!=null){const diff=dc-dp-d;if(Math.abs(diff)>0.07)issues.push({i,a,diff})}}
+  if(solved[i]!=null&&solved[i]*e.sg<-0.07)issues.push({i,a:e.ax,flip:true,diff:solved[i]})}
+ const len=N.map((nd,i)=>{const e=edge[i];if(!e)return null;return e.L!=null?e.L:(solved[i]!=null?Math.abs(solved[i]):null)});
+ const pos=N.map((_,i)=>val.E[i]!=null&&val.N[i]!=null&&val.Z[i]!=null?[val.E[i],val.N[i],val.Z[i]]:null);
+ return{val,pos,len,issues,edge,solved}}
+
+/* ---------- image, rotate, zoom ---------- */
+$('#pick').onclick=$('#pick2').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const i=new Image();i.onload=()=>{LASTIMGS=null;S.notes=[];S.list=null;let c=i;for(let k=0;k<S.rot;k++)c=spin(c,1,false);img=c;cv.width=img.width;cv.height=img.height;cv.style.display='block';$('#empty').hidden=true;$('#fc').hidden=false;fit();refreshAuto();update()};i.src=URL.createObjectURL(f)};
+function spin(src,dir,moveNodes){const w=src.width,h=src.height,c=document.createElement('canvas');c.width=h;c.height=w;const x=c.getContext('2d');
+ if(dir>0){x.translate(h,0);x.rotate(Math.PI/2);if(moveNodes)S.nodes.forEach(p=>{const u=p.u;p.u=h-p.v;p.v=u})}
+ else{x.translate(0,w);x.rotate(-Math.PI/2);if(moveNodes)S.nodes.forEach(p=>{const u=p.u;p.u=p.v;p.v=w-u})}
+ x.drawImage(src,0,0);return c}
+function rotate(dir){if(!img)return;img=spin(img,dir,true);S.rot=(S.rot+(dir>0?1:3))%4;cv.width=img.width;cv.height=img.height;fit();save();update()}
+$('#rl').onclick=()=>rotate(-1);$('#rr').onclick=()=>rotate(1);
+function setZoom(z){zoom=Math.max(.05,Math.min(6,z));cv.style.width=cv.width*zoom+'px';cv.style.height=cv.height*zoom+'px'}
+function fit(){setZoom(Math.min(1,view.clientWidth/cv.width))}
+$('#zi').onclick=()=>{setZoom(zoom*1.4);draw()};$('#zo').onclick=()=>{setZoom(zoom/1.4);draw()};$('#zf').onclick=()=>{fit();draw()};
+
+/* ---------- steps ---------- */
+function go(t){tab=t;document.querySelectorAll('.steps button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id===t));$('#dock').classList.remove('min');if(t==='find')fillFind();if(t==='check')renderCheck();update();if(t==='find'){$('#dock').scrollTop=0;if(img&&findMode()!=='none')draw(true)}}
+document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+$('#to2').onclick=()=>go('trace');$('#to3').onclick=()=>go('find');
+$('#grab').onclick=()=>$('#dock').classList.toggle('min');
+$('#help').onclick=()=>$('#helpbox').classList.add('open');$('#hclose').onclick=()=>{$('#helpbox').classList.remove('open');S.seen=true;save()};
+$('#helpbox').onclick=e=>{if(e.target.id==='helpbox')$('#hclose').click()};
+
+/* ---------- photo step ---------- */
+function fillNorth(){const c=$('#nchips');c.innerHTML='';[['UL','↖ Up-left'],['UR','↗ Up-right'],['DL','↙ Down-left'],['DR','↘ Down-right']].forEach(([k,l])=>{const b=el('button',S.north===k?'on':'',l);b.onclick=()=>{S.north=k;S.nodes.forEach(nd=>{if(nd.parent>=0&&S.nodes[nd.parent])nd.dir=autoDir(S.nodes[nd.parent],nd)});fillNorth();renderNodes();save();update()};c.append(b)})}
+
+/* ---------- auto-read with Claude ---------- */
+const P1=['This is a photo of one sheet of a plant piping isometric drawing (an "iso").',
+ 'Reply with only JSON in this shape: {"turns":0,"box":{"x0":0,"y0":0,"x1":1000,"y1":1000}}',
+ '"turns" is how many 90-degree CLOCKWISE turns the photo needs so the printed text reads upright, left to right (0, 1, 2 or 3).',
+ '"box" is the rectangle that tightly contains the isometric pipe drawing itself, including its coordinate notes (CONT ON, CONN TO, EL, E, N) and dimension text. Leave out the material list, notes tables and title block. Give it in thousandths of the photo width and height, measured from the top-left corner of the photo as it is shown now (before any turning).'].join('\n');
+const P2=(set)=>{const t=set&&set.cols?set.cols*set.rows:0;return[
+ t?'These '+(t+1)+' images show the isometric pipe drawing from a plant piping iso, already upright. Image 1 is the whole drawing. Images 2 to '+(t+1)+' are zoomed-in tiles of the same drawing, '+set.cols+' across and '+set.rows+' down, in reading order (left to right, then top to bottom), and neighbouring tiles overlap by about 12%. Use Image 1 to place points. Use the tiles to read every printed number exactly, because the print is tiny in Image 1.':'This image is a close-up of the isometric pipe drawing from a plant piping iso, already upright.',
+ 'Trace the pipe as a list of points. A point is where the pipe ends, turns at an elbow, or branches at a tee. Number the points from 1 in order along the pipe. Start at an end that has printed coordinates (a note such as "CONT ON" or "CONN TO" with E, N and EL values) and finish at the other end. Add each branch pipe after the main pipe.',
+ 'Reply with only JSON in this shape:',
+ '{"north":"UL","points":[{"id":1,"x":500,"y":300,"from":null,"go":null,"length":null,"E":null,"N":null,"EL":null}]}',
+ '- x, y: where the point sits on the pipe line, in thousandths of the whole drawing\'s width and height (Image 1) from its top-left corner. Use the centre of an elbow or the end of the pipe. Put each point exactly on the pipe line.',
+ '- from: the id of the point this run of pipe starts from. null for point 1, and null for the start of a separate line.',
+ '- go: which way this run travels on the page, from its "from" point to this point: "UP", "DOWN", "UL", "UR", "DL" or "DR" (up-left, up-right, down-left, down-right). Iso pipe only runs straight up and down, or along the two slanted axes, so every run is one of these six. null for the first point of a line.',
+ '- length: the dimension printed for the run from "from" to this point, copied exactly as printed (for example 5\'7", 2 1/2", 1\'1 7/8"). Only when that dimension measures that whole run. Otherwise null. Never guess.',
+ '- E, N, EL: the coordinates printed for this exact point, copied exactly as printed with the feet and inch marks (example 12490\'7.7/8"). null when none are printed for it. If only EL is printed, give only EL.',
+ '- north: which way the N arrow points on this image: "UL" up-left, "UR" up-right, "DR" down-right, "DL" down-left, or null if no N arrow is visible.',
+ 'Dimension text runs along its dimension line, so it can be slanted: read it at its angle. Look at each number before you copy it, and keep fractions exactly as printed (7/8 stays 7/8). If a digit is unclear, use null instead of guessing.',
+ 'Never invent numbers. Use null when unsure.'].join('\n')};
+const P4=(set)=>{const t=set&&set.cols?set.cols*set.rows:0;return[
+ t?'These '+(t+1)+' images show the isometric pipe drawing from a plant piping iso, already upright. Image 1 is the whole drawing. Images 2 to '+(t+1)+' are zoomed-in tiles of the same drawing, '+set.cols+' across and '+set.rows+' down, in reading order, overlapping by about 12%. Use the tiles to read every number exactly. Use Image 1 for positions.':'This image is a close-up of the isometric pipe drawing from a plant piping iso, already upright.',
+ 'Find every printed coordinate note on the drawing. These are notes at the ends of a pipe, such as "CONT ON", "CONN TO" or a tie-in, that give E, N and EL values. Also include E, N or EL values printed on their own beside a pipe end. Do not include lengths or dimensions, the title block, or line numbers.',
+ 'Reply with only JSON in this shape:',
+ '{"notes":[{"label":"CONT ON","x":500,"y":300,"E":null,"N":null,"EL":null}]}',
+ '- x, y: where the pipe end that this note points to sits, in thousandths of the whole drawing width and height (Image 1), from its top-left corner. If you cannot tell, give where the note text is.',
+ '- E, N, EL: copy exactly as printed with the feet and inch marks (example 12490\'7.7/8"). Keep fractions as printed. null for a value that is not printed. A note is often printed twice with the same values: list it once.',
+ 'Text can be slanted or upside down: read it at its angle. Read every digit one at a time. If a digit is unclear, use null instead of guessing. Never invent numbers.'].join('\n')};
+const P6=['This is a photo of one whole sheet of a plant piping isometric drawing (an "iso"), already upright.','Find the rectangles that hold printed tables: the material lists (fabrication and erection materials), the cut pipe length or spool table, the weld list, and the title block.','Reply with only JSON in this shape: {"tables":[{"name":"materials","x0":0,"y0":0,"x1":300,"y1":400}]}','name is one of: materials, cut, welds, title. Give each rectangle in thousandths of the photo width and height from its top-left corner. Make each rectangle tight but include the table header row and every row. Use one rectangle per table. Do not include the drawing of the pipe itself. Leave out tables you cannot see.'].join('\n');
+const KINDLIST='pipe, elbow (90 or 45 degree), tee, reducer, fitting (couplings, caps, plugs, branch connections), valve, flange, gasket, bolt (bolts, studs and nuts), instrument, support, weld, cut, other';
+const SHAPE='{"line":null,"items":[{"kind":"elbow","ref":"2","desc":"90 DEG ELBOW A105N CL.6000 SW","what":"90-degree elbow","size":"2\\"","qty":"4"}]}';
+const WHAT='- what: a plain-English name a beginner understands, 2 to 6 words (for example "90-degree elbow", "tee", "gate valve", "flange", "spiral-wound gasket", "bolts and nuts", "pipe shoe support").';
+const P5=(n,focused)=>[
+ focused?'These '+n+' images are close-ups of the tables printed on one sheet of a plant piping isometric drawing: material lists, cut pipe lengths, and the weld list.':'These '+n+' images show one whole sheet of a plant piping isometric drawing (an "iso"). Image 1 is the whole sheet and the others are zoomed tiles. Find the tables of text (material lists, cut pipe lengths, weld list) and read them.',
+ 'Read every row of every table. Copy from the sheet. Do not invent anything. One entry per row. Weld list: one entry per weld tag (for example F1, S1). Cut pipe list: one entry per piece.',
+ 'Reply with only JSON in this shape:',SHAPE,
+ '- line: the line or drawing number from the title block, or null.',
+ '- kind: one of '+KINDLIST+'.',
+ '- ref: the item number, tag, weld number or piece number as printed. desc: the description as printed, shortened to 80 characters. size and qty: as printed (qty for pipe is a length), or null.',WHAT,
+ 'Text can be small or slanted: read each row at its angle, one cell at a time. If a cell is unclear use null for that cell. If a table is unreadable, skip it. Never guess.'].join('\n');
+const P7=(set,ctx)=>{const t=set&&set.cols?set.cols*set.rows:0;return[
+ t?'These '+(t+1)+' images show the isometric pipe drawing from a plant piping iso, already upright. Image 1 is the whole drawing. Images 2 to '+(t+1)+' are zoomed-in tiles of it, '+set.cols+' across and '+set.rows+' down, in reading order, overlapping by about 12%. Use the tiles to read small print.':'This image is a close-up of the isometric pipe drawing from a plant piping iso, already upright.',
+ 'A person will walk this pipe and check off what is on it. List what is drawn on it:',
+ '- kind "mark": every circled number along the pipe, in the order you meet them walking from one end of the line to the other. If the circled number matches a number in the NO column of the material list below, copy that item\'s description into desc and give what. Otherwise leave desc null.',
+ '- kind "tag": every diamond or boxed tag such as J1, J2 or S18. desc: any text beside it.',
+ '- kind "support": boxed support tags such as PS-001 or SP1. desc: any text beside it.',
+ '- kind valve, tee or elbow: any valve, tee or elbow that is drawn and labeled on the pipe, if it is not already a circled mark.',
+ ctx?'Material list already read (NO: description):\n'+ctx:'',
+ 'Reply with only JSON in this shape:','{"items":[{"kind":"mark","ref":"12","desc":"90 DEG ELBOW A105N CL.6000 SW","what":"90-degree elbow","x":500,"y":300}]}',
+ '- ref: the number or tag as printed. '+WHAT.slice(2),
+ '- x, y: where it sits on the drawing, in thousandths of the whole drawing width and height (Image 1) from its top-left corner. Point at the circle, diamond or box itself. Give x and y for every item.',
+ 'Never invent anything. If you are unsure of a value, use null.'].filter(Boolean).join('\n')};
+const P3=(set,list,probs)=>{const t=set&&set.cols?set.cols*set.rows:0;return[
+ t?'Image 1 shows the whole isometric pipe drawing from a plant piping iso, already upright. Images 2 to '+(t+1)+' are zoomed-in tiles of it, '+set.cols+' across and '+set.rows+' down, in reading order, overlapping by about 12%. Use the tiles to read the small print.':'The image shows the isometric pipe drawing from a plant piping iso, already upright.',
+ 'The pipe was traced as the list below. Each point has: id; from (the point its run starts at, null for a start); length (the printed dimension of the run from "from" to this point); E, N, EL (coordinates printed at this exact point). null means nothing is recorded.',
+ JSON.stringify(list),
+ 'The arithmetic found these problems: '+(probs.length?probs.join(' '):'none')+'.',
+ 'Look closely at the print. Find numbers in the list that were misread, missed, or put on the wrong point, and correct them. Reply with only JSON in this shape: {"fixes":[{"id":5,"length":"5\'7\\""}]}',
+ 'Include only the fields that must change (length, E, N, EL), copied exactly as printed with feet and inch marks. Use "" for a field that has nothing printed. Never guess: change a number only when you can read the print clearly. If nothing should change, reply {"fixes":[]}.'].join('\n')};
+/* ---------- make the photo easier to read: even out light, then zoom into tiles ---------- */
+function enhance(c){const w=c.width,h=c.height,x=c.getContext('2d');
+ const sm=document.createElement('canvas');sm.width=Math.max(4,Math.round(w/24));sm.height=Math.max(4,Math.round(h/24));const sx=sm.getContext('2d');sx.imageSmoothingQuality='high';sx.drawImage(c,0,0,sm.width,sm.height);
+ const bg=document.createElement('canvas');bg.width=w;bg.height=h;const bx=bg.getContext('2d');bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(sm,0,0,w,h);
+ const A=x.getImageData(0,0,w,h),B=bx.getImageData(0,0,w,h),a=A.data,b=B.data,lut=new Uint8ClampedArray(256);
+ for(let i=0;i<256;i++)lut[i]=255*Math.pow(i/255,1.25);
+ for(let i=0;i<a.length;i+=4){const l=.3*b[i]+.59*b[i+1]+.11*b[i+2],g=248/Math.max(l,90);a[i]=lut[Math.min(255,a[i]*g)|0];a[i+1]=lut[Math.min(255,a[i+1]*g)|0];a[i+2]=lut[Math.min(255,a[i+2]*g)|0]}
+ x.putImageData(A,0,0)}
+function cblob(c,max){const sc=Math.min(1,max/Math.max(c.width,c.height));let t=c;if(sc<1){t=document.createElement('canvas');t.width=Math.max(1,Math.round(c.width*sc));t.height=Math.max(1,Math.round(c.height*sc));const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(c,0,0,t.width,t.height)}
+ return new Promise((ok,no)=>t.toBlob(b=>b?ok(b):no({code:'image_rejected'}),'image/jpeg',.92))}
+// Claude shrinks every photo to about 1.2 megapixels, so one picture of a whole sheet loses the small print.
+// Send the whole drawing (to place points) plus zoomed tiles (to read numbers), as many as the view allows.
+async function makeSet(src,sx,sy,sw,sh,maxImgs){
+ const k=Math.min(1,3200/Math.max(sw,sh)),W=Math.max(1,Math.round(sw*k)),H=Math.max(1,Math.round(sh*k));
+ const base=document.createElement('canvas');base.width=W;base.height=H;const bx=base.getContext('2d');bx.imageSmoothingQuality='high';bx.drawImage(src,sx,sy,sw,sh,0,0,W,H);
+ try{enhance(base)}catch(e){}
+ const blobs=[await cblob(base,1500)],cap=Math.min(6,maxImgs-1),OV=.12;let best=null;
+ for(let c=1;c<=3;c++)for(let r=1;r<=3;r++){const n=c*r;if(n<2||n>cap)continue;const tw=W/(c-(c-1)*OV),th=H/(r-(r-1)*OV),side=Math.max(tw,th);if(side<380)continue;if(!best||n>best.n||(n===best.n&&side<best.side))best={c,r,n,tw,th,side}}
+ if(!best)return{blobs,cols:0,rows:0,w:sw,h:sh};
+ const s=Math.min(2.5,1100/best.side);
+ for(let i=0;i<best.r;i++)for(let j=0;j<best.c;j++){
+  const tx=Math.max(0,Math.min(W-best.tw,j*best.tw*(1-OV))),ty=Math.max(0,Math.min(H-best.th,i*best.th*(1-OV)));
+  const t=document.createElement('canvas');t.width=Math.max(1,Math.round(best.tw*s));t.height=Math.max(1,Math.round(best.th*s));const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(base,tx,ty,best.tw,best.th,0,0,t.width,t.height);blobs.push(await cblob(t,2000))}
+ return{blobs,cols:best.c,rows:best.r,w:sw,h:sh}}
+
+/* ---------- ask Claude to check the numbers again ---------- */
+function vbusy(on,msg){$('#vst').hidden=!on;$('#vtxt').textContent=msg||'';$('#chk').disabled=on}
+$('#chk').onclick=()=>verify();
+$('#vstop').onclick=()=>{if(readCtl)readCtl.abort()};
+async function verify(){
+ if(!sampleFn||!LASTIMGS||readCtl)return;
+ const keep=S.nodes.map(n=>({len:n.len,E:n.E,N:n.N,Z:n.Z})),b0=score(),idOf=i=>S.nodes[i].pid!=null?S.nodes[i].pid:i+1;
+ const list=S.nodes.map((n,i)=>({id:idOf(i),from:n.parent>=0?idOf(n.parent):null,length:n.len||null,E:n.E||null,N:n.N||null,EL:n.Z||null}));
+ const probs=[];R.issues.forEach(s=>probs.push(s.flip?'The run to point '+idOf(s.i)+' seems to go the wrong way for its numbers.':'At point '+idOf(s.i)+', '+{E:'East',N:'North',Z:'elevation'}[s.a]+' is off by '+fmtIn(Math.abs(s.diff))+'.'));
+ R.pos.forEach((p,i)=>{if(!p)probs.push('Point '+idOf(i)+' has no worked-out coordinates: a length or printed coordinate there is missing or misread.')});
+ readCtl=new AbortController();vbusy(true,'Checking the numbers against the photo…');
+ try{
+  const r=await sampleFn.json(P3(LASTIMGS,list,probs),{images:LASTIMGS.blobs,modelTier:'complex',signal:readCtl.signal});
+  const fx=Array.isArray(r&&r.fixes)?r.fixes:[];let ch=0;
+  fx.forEach(f=>{if(!f)return;const i=S.nodes.findIndex((n,k)=>idOf(k)===f.id);if(i<0)return;const n=S.nodes[i];
+   [['length','len'],['E','E'],['N','N'],['EL','Z']].forEach(([a,b])=>{if(f[a]===undefined||f[a]===null)return;const v=clean(f[a]);if(v!==String(n[b]||'')){n[b]=v;ch++}})});
+  const b1=score();
+  if(!ch)anote='Claude looked again and found nothing to change. If a number is wrong, fix it by hand in its point.';
+  else if(b1>b0){S.nodes.forEach((n,i)=>{n.len=keep[i].len;n.E=keep[i].E;n.N=keep[i].N;n.Z=keep[i].Z});anote='Claude suggested '+ch+(ch===1?' change':' changes')+', but they made the numbers add up worse, so your numbers were kept.'}
+  else{const rr=solve(),un=rr.pos.filter(p=>!p).length;anote='Claude changed '+ch+(ch===1?' number':' numbers')+'. '+(rr.issues.length?'Some numbers still don\'t add up.':un?un+(un===1?' point still needs':' points still need')+' a length or printed coordinates.':'Everything adds up now.')}
+  renderNodes();save();showNote()
+ }catch(e){const c=e&&e.code;if(c!=='cancelled'){anote=ERR[c]||'Something went wrong checking the numbers. Try again, or fix them by hand.';showNote()}}
+ finally{readCtl=null;vbusy(false);update()}}
+
+const ERR={not_granted:'Claude wasn\'t allowed to read the photo. Allow it when asked, or trace by hand.',rate_limited:'Too many requests right now. Wait a minute, then try again.',session_expired:'Sign in again, then try again.',image_rejected:'That photo was rejected. Try a different one.',invalid_json:'Claude\'s answer couldn\'t be read. Try again, or trace by hand.',sampling_disabled:'Claude isn\'t available for this account. Trace by hand.',images_unavailable:'This view can\'t send photos to Claude. Trace by hand.'};
+const FATAL=['not_granted','rate_limited','session_expired','image_rejected','sampling_disabled','images_unavailable','cancelled'];
+async function initSample(){try{const C=window.claude;if(C&&C.use){const s=await C.use('sample');if(s){const l=await s.limits().catch(()=>null);if(l&&l.images){sampleFn=s;MAXIMG=Math.max(1,+l.images.maxCount||1)}}}}catch(e){}refreshAuto()}
+function refreshAuto(){$('#auto').hidden=!sampleFn;$('#auto').disabled=!img||!!readCtl;
+ $('#autonote').textContent=sampleFn?(img?'Claude turns the photo upright, zooms in on the small print, and reads the coordinates printed at the pipe ends. You get the answer first, then the full route. This takes about a minute.':'Choose a photo first.'):(window.__STREAMLIT?'To have Claude read an iso, add the photo in the section above this tool. Or set it up by hand below.':'Auto-read is not available in this view. Use "Set up by hand", then trace the pipe in step 2.')}
+function busy(on,msg){{const f=$('#fbtxt');if(f)f.textContent=on?(msg||''):''}$('#autost').hidden=!on;$('#autotxt').textContent=msg||'';$('#auto').disabled=on||!img;$('#banner').textContent=bannerText()}
+$('#auto').onclick=()=>readIso();
+$('#stop').onclick=()=>{if(readCtl)readCtl.abort()};
+function toBlob(src,sx,sy,sw,sh,max){const sc=Math.min(1,max/Math.max(sw,sh)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*sc));c.height=Math.max(1,Math.round(sh*sc));c.getContext('2d').drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no({code:'image_rejected'}),'image/jpeg',.9))}
+function normBox(b){if(!b)return null;const c=v=>Math.max(0,Math.min(1000,+v)),x0=c(b.x0),y0=c(b.y0),x1=c(b.x1),y1=c(b.y1);if(![x0,y0,x1,y1].every(isFinite)||x1-x0<100||y1-y0<100)return null;return{x0,y0,x1,y1}}
+function rotBox(b,t){let x0=b.x0,y0=b.y0,x1=b.x1,y1=b.y1;for(let k=0;k<t;k++){const a=1000-y1,c=1000-y0,d=x0,e=x1;x0=a;x1=c;y0=d;y1=e}return{x0,y0,x1,y1}}
+async function readIso(){
+ if(!sampleFn||!img||readCtl)return;
+ readCtl=new AbortController();const sig=readCtl.signal;busy(true,'Finding the drawing on the sheet…');
+ try{
+  let turns=0,box=null;
+  try{const b1=await toBlob(img,0,0,img.width,img.height,1600);const r1=await sampleFn.json(P1,{images:[b1],modelTier:'default',signal:sig});
+   if(r1&&isFinite(+r1.turns))turns=((Math.round(+r1.turns)%4)+4)%4;box=normBox(r1&&r1.box)}
+  catch(e){if(e&&FATAL.includes(e.code))throw e}
+  for(let k=0;k<turns;k++)img=spin(img,1,true);
+  if(turns){S.rot=(S.rot+turns)%4;cv.width=img.width;cv.height=img.height;fit()}
+  if(box&&turns)box=rotBox(box,turns);
+  let cx0=0,cy0=0,cw=img.width,ch=img.height;
+  if(box){const mx=.03*(box.x1-box.x0),my=.03*(box.y1-box.y0);const x0=Math.max(0,box.x0-mx),x1=Math.min(1000,box.x1+mx),y0=Math.max(0,box.y0-my),y1=Math.min(1000,box.y1+my);cx0=x0/1000*img.width;cy0=y0/1000*img.height;cw=(x1-x0)/1000*img.width;ch=(y1-y0)/1000*img.height}
+  LAST={x:cx0,y:cy0,w:cw,h:ch};draw();
+  busy(true,'Sharpening the photo and zooming in…');
+  const set=await makeSet(img,cx0,cy0,cw,ch,MAXIMG);
+  busy(true,'Reading the printed coordinates…');
+  let nn=0;
+  try{const rn=await sampleFn.json(P4(set),{images:set.blobs,modelTier:'complex',signal:sig});S.notes=[];nn=importNotes(rn,LAST)}
+  catch(e){if(e&&FATAL.includes(e.code))throw e}
+  LASTIMGS=set;
+  if(nn){anote='';showNote();go('find')}
+  busy(true,'Reading the lists on the sheet…');
+  try{await runList(sig)}catch(e){if(e&&e.code==='cancelled')throw e;if(e&&FATAL.includes(e.code)&&!nn&&!listItems().length)throw e}
+  const lo=Math.max(cw,ch);
+  if(lo<1400){anote+=' This photo is low resolution: the drawing is only '+Math.round(lo)+' px across, so small numbers may be misread. Retake it closer, or scan it, for a clearer read.';showNote()}
+  if(nn){update();if(tab==='find'){fillFind();draw(true)}return}
+  busy(true,'No coordinates found. Tracing the pipe route instead…');
+  let out=null;
+  try{const r2=await sampleFn.json(P2(set),{images:set.blobs,modelTier:'complex',signal:sig});out=importRead(r2,LAST)}
+  catch(e){if(e&&FATAL.includes(e.code)&&!listItems().length)throw e;if(e&&e.code==='cancelled')throw e}
+  if(!out){anote='Claude couldn\'t find any coordinates or a pipe to trace. Try a sharper photo, or trace by hand.';showNote();go(listItems().length?'check':'trace');return}
+  go(findMode()==='trace'?'find':'trace')
+ }catch(e){const c=e&&e.code;if(c!=='cancelled'){anote=ERR[c]||'Something went wrong reading the photo. Try again, or trace by hand.';showNote()}}
+ finally{readCtl=null;busy(false);refreshAuto();update()}}
+async function runTrace(){if(!sampleFn||!img||readCtl){go('trace');return}
+ if(!LAST)LAST={x:0,y:0,w:img.width,h:img.height};
+ if(!LASTIMGS){try{LASTIMGS=await makeSet(img,LAST.x,LAST.y,LAST.w,LAST.h,MAXIMG)}catch(e){go('trace');return}}
+ readCtl=new AbortController();busy(true,'Tracing the full route…');update();
+ try{const r2=await sampleFn.json(P2(LASTIMGS),{images:LASTIMGS.blobs,modelTier:'complex',signal:readCtl.signal});const keepNotes=S.notes;const ok=importRead(r2,LAST);S.notes=keepNotes;save();
+  anote=ok?'':'Claude could not trace the route. You can trace it by hand in the Trace step.';
+  if(ok&&findMode()!=='trace')anote='The route did not add up, so the answer still uses the printed coordinates. Open Trace to fix it.'}
+ catch(e){const c=e&&e.code;if(c!=='cancelled')anote=ERR[c]||'Something went wrong tracing the route.'}
+ finally{readCtl=null;busy(false);refreshAuto();showNote();update();if(tab==='find'){fillFind();draw(true)}}}
+function clean(v){if(v==null)return'';const s=String(v).trim();return/^(null|none|n\/a)$/i.test(s)?'':s}
+function applyNorth(k){S.north=k;S.nodes.forEach(nd=>{nd.dir=nd.parent>=0&&S.nodes[nd.parent]?(nd.hint?dirFromVec(nd.hint[0],nd.hint[1]):autoDir(S.nodes[nd.parent],nd)):'U'})}
+function score(){const r=solve();return r.issues.length*100+r.pos.filter(p=>!p).length}
+function importNotes(d,crop){
+ const a=Array.isArray(d&&d.notes)?d.notes:[],out=[];
+ a.forEach(n=>{if(!n)return;const E=clean(n.E),N=clean(n.N),Z=clean(n.EL!=null?n.EL:n.Z);
+  if(![E,N,Z].some(v=>v!==''&&isFinite(dim(v))))return;
+  const x=+n.x,y=+n.y,ok=isFinite(x)&&isFinite(y);
+  out.push({label:clean(n.label)||'Note',u:ok?crop.x+Math.max(0,Math.min(1000,x))/1000*crop.w:null,v:ok?crop.y+Math.max(0,Math.min(1000,y))/1000*crop.h:null,E,N,Z})});
+ const seen=new Set();S.notes=out.filter(n=>{const k=[n.E,n.N,n.Z].join('|');if(seen.has(k))return false;seen.add(k);return true});
+ save();return S.notes.length}
+function NOTEPTS(){return(S.notes||[]).map(n=>[dim(n.E),dim(n.N),dim(n.Z)].map(v=>isFinite(v)?v:null)).filter(p=>p.some(v=>v!=null))}
+function findMode(){return R&&solvedRuns()&&!R.issues.length?'trace':NOTEPTS().length?'notes':'none'}
+function importRead(d,crop){
+ const pts=Array.isArray(d&&d.points)?d.points:[],ids=new Map(),nodes=[];
+ pts.forEach((p,k)=>{if(!p)return;const x=+p.x,y=+p.y;if(!isFinite(x)||!isFinite(y))return;ids.set(p.id!=null?p.id:k+1,nodes.length);
+  nodes.push({u:crop.x+Math.max(0,Math.min(1000,x))/1000*crop.w,v:crop.y+Math.max(0,Math.min(1000,y))/1000*crop.h,parent:-1,dir:'U',len:clean(p.length),E:clean(p.E),N:clean(p.N),Z:clean(p.EL!=null?p.EL:p.Z),from:p.from,hint:GO[String(p.go||'').toUpperCase()]||null,pid:p.id!=null?p.id:k+1})});
+ if(nodes.length<2)return null;
+ nodes.forEach((nd,i)=>{const f=nd.from;delete nd.from;if(i===0){nd.parent=-1;return}if(f===undefined)nd.parent=i-1;else if(f===null)nd.parent=-1;else{const j=ids.get(f);nd.parent=(j!==undefined&&j<i)?j:i-1}});
+ nodes.forEach(nd=>{const h=nd.hint;if(!h||nd.parent<0)return;const a=nodes[nd.parent];let dx=nd.u-a.u,dy=nd.v-a.v;const m=Math.hypot(dx,dy);if(m<1)return;const cs=(dx*h[0]+dy*h[1])/m;if(cs>.82){const t=Math.max(8,dx*h[0]+dy*h[1]);nd.u=a.u+h[0]*t;nd.v=a.v+h[1]*t}});
+ S.nodes=nodes;G={lvl:null,nb:null,eb:null};
+ const guess=CYC.includes(d.north)?d.north:S.north;let best=guess,bs=1e9;
+ [guess,...CYC.filter(c=>c!==guess)].forEach(c=>{applyNorth(c);const sc=score();if(sc<bs){bs=sc;best=c}});applyNorth(best);
+ let dropped=0;
+ if(solve().issues.length){let base=score();for(const nd of S.nodes){if(String(nd.len||'').trim()==='')continue;const keep=nd.len;nd.len='';const sc=score();if(sc<base){base=sc;dropped++}else nd.len=keep}}
+ const r=solve(),un=r.pos.filter(p=>!p).length,lens=S.nodes.filter(q=>String(q.len||'').trim()!=='').length;
+ anote='Claude placed '+nodes.length+' points'+(lens?' and read '+lens+(lens===1?' length':' lengths'):'')+'. '+(dropped?'It dropped '+dropped+(dropped===1?' length':' lengths')+' that didn\'t add up. ':'')+
+  (r.issues.length?'Some numbers still don\'t add up: see the red messages.':un?un+(un===1?' point still needs':' points still need')+' a length or printed coordinates.':'Everything adds up.')+' Check that each point sits on the pipe. Use More, then Move this point, to fix one.';
+ sel=0;renderNodes();save();showNote();return true}
+function showNote(){const a=$('#anote');a.hidden=!anote;a.textContent=anote;const f=$('#fnote');if(f){f.hidden=!anote;f.textContent=anote}}
+
+/* ---------- trace step ---------- */
+cv.addEventListener('click',e=>{if(!img||tab!=='trace')return;const r=cv.getBoundingClientRect(),u=(e.clientX-r.left)*cv.width/r.width,v=(e.clientY-r.top)*cv.height/r.height;
+ if(replacing!=null){const nd=S.nodes[replacing];nd.u=u;nd.v=v;nd.hint=null;replacing=null;save();update();return}
+ const i=S.nodes.length,p=i?i-1:-1,nd={u,v,parent:p,dir:'U',len:'',E:'',N:'',Z:''};if(p>=0)nd.dir=autoDir(S.nodes[p],nd);
+ S.nodes.push(nd);sel=i;renderNodes();save();update();$('#dock').scrollTop=0});
+$('#undo').onclick=()=>{if(!S.nodes.length)return;S.nodes.pop();sel=S.nodes.length?S.nodes.length-1:null;renderNodes();save();update()};
+$('#clr').onclick=()=>{const b=$('#clr');if(S.nodes.length>1&&!clrArm){clrArm=1;b.textContent='Tap again to remove all';setTimeout(()=>{clrArm=0;b.textContent='Start over'},3000);return}
+ clrArm=0;LASTIMGS=null;b.textContent='Start over';S.nodes=[];S.notes=[];S.list=null;sel=null;replacing=null;anote='';showNote();G={lvl:null,nb:null,eb:null};renderNodes();save();update()};
+function inp(ph,val,label,fn){const i=el('input');i.type='text';i.className='mono';i.placeholder=ph;i.value=val||'';i.autocapitalize='off';i.autocomplete='off';i.setAttribute('autocorrect','off');i.spellcheck=false;i.setAttribute('aria-label',label);i.oninput=()=>{fn(i.value);save();update()};return i}
+function renderNodes(){renderStrip();renderCard()}
+function renderStrip(){const s=$('#strip');s.innerHTML='';S.nodes.forEach((nd,i)=>{const b=el('button',i===sel?'on':'',String(i+1));b.dataset.i=i;b.setAttribute('aria-label','Point '+(i+1));b.onclick=()=>{sel=i;renderNodes();draw()};s.append(b)})}
+function renderCard(){const c=$('#card');c.innerHTML='';if(sel==null||!S.nodes[sel])return;const i=sel,nd=S.nodes[i],w=el('div','card');
+ const hd=el('div','chead'),tt=el('div');tt.append(el('h3',null,'Point '+(i+1)),el('div','sub',nd.parent>=0?'Run from point '+(nd.parent+1):(i===0?'Start of the pipe':'Start of a new line')));
+ const tg=el('span','tag');tg.id='ctag';hd.append(tt,tg);w.append(hd);
+ const ro=el('div','readout');[['East','rE'],['North','rN'],['Elevation','rZ']].forEach(([l,id])=>{const x=el('div');x.append(el('span','k',l));const v=el('span','v','?');v.id=id;x.append(v);ro.append(x)});w.append(ro);
+ if(nd.parent>=0){w.append(el('label','lbl','Which way does the pipe go?'));const g=el('div','grid3');
+  DIRS.forEach(d=>{const b=el('button',nd.dir===d?'on':'',arrow(d)+' '+NAME[d]);b.dataset.d=d;b.onclick=()=>{nd.dir=d;renderCard();save();update()};g.append(b)});w.append(g);
+  w.append(el('label','lbl','Length, as printed on the iso'));const L=inp('like 5\'7" or 2.1/2"',nd.len,'Length of run '+(i+1),v=>{nd.len=v});L.id='len';w.append(L)}
+ const has=['E','N','Z'].some(a=>String(nd[a]||'').trim()!==''),d=el('details');if(has||nd.parent<0)d.open=true;d.append(el('summary',null,'Printed coordinates'));
+ const g2=el('div','stack');[['E','East'],['N','North'],['Z','Elevation']].forEach(([k,l])=>{const x=el('div');x.append(el('label','lbl',l),inp(k==='Z'?'EL':k,nd[k],l+' of point '+(i+1),v=>{nd[k]=v}));g2.append(x)});d.append(g2);w.append(d);
+ const m=el('details');m.append(el('summary',null,'More'));const r=el('div','row');
+ const mv=el('button',null,'Move this point');mv.onclick=()=>{replacing=i;update()};r.append(mv);m.append(r);
+ if(i>0){const s=el('select');s.setAttribute('aria-label','Run starts from');s.innerHTML='<option value="-1">Starts a new line</option>'+S.nodes.slice(0,i).map((_,k)=>'<option value="'+k+'">Branches from #'+(k+1)+'</option>').join('');s.value=String(nd.parent);s.onchange=()=>{nd.parent=+s.value;if(nd.parent>=0)nd.dir=autoDir(S.nodes[nd.parent],nd);renderNodes();save();update()};const r2=el('div','row');r2.append(s);m.append(r2)}
+ w.append(m);c.append(w)}
+
+/* ---------- find step ---------- */
+$('#nsp').oninput=()=>{S.nsp=parseFloat($('#nsp').value)||100;save();fillFind();draw()};
+$('#esp').oninput=()=>{S.esp=parseFloat($('#esp').value)||100;save();fillFind();draw()};
+$('#pad').oninput=()=>{S.pad=+$('#pad').value;$('#padv').textContent=S.pad+' px';save();draw()};
+function range(k){let lo=1e18,hi=-1e18;(findMode()==='trace'?R.pos:NOTEPTS()).forEach(p=>{if(p&&p[k]!=null&&isFinite(p[k])){lo=Math.min(lo,p[k]);hi=Math.max(hi,p[k])}});return lo<=hi?[lo,hi]:null}
+function zones(){const out={lvl:[],nb:[],eb:[]};if(!R)return out;
+ const rz=range(2),rn=range(1),re=range(0);
+ if(rz){const w=LEVEL_H*12,b=LEVEL_BASE*12;
+  if(rz[0]<b)out.lvl.push({key:'Lb',lo:-Infinity,hi:b,lab:'Below '+LEVEL_BASE+"'"});
+  for(let i=Math.max(0,Math.floor((rz[0]-b)/w));i<=Math.floor((rz[1]-b)/w);i++)out.lvl.push({key:'L'+i,lo:b+i*w,hi:b+(i+1)*w,lab:'Level '+(i+1)+' \u00b7 '+(LEVEL_BASE+i*LEVEL_H)+"\u2013"+(LEVEL_BASE+(i+1)*LEVEL_H)+"'"})}
+ const bands=(r,sp,pre,arr)=>{if(!r)return;const w=sp*12;for(let i=Math.floor(r[0]/w);i<=Math.floor(r[1]/w);i++)arr.push({key:pre+i,lo:i*w,hi:(i+1)*w,lab:pre+' '+Math.round(i*sp)+"\u2013"+Math.round((i+1)*sp)+"'"})};
+ bands(rn,S.nsp,'N',out.nb);bands(re,S.esp,'E',out.eb);return out}
+function chipRow(id,arr,k,empty){const c=$(id);c.innerHTML='';const mk=(key,lab)=>{const b=el('button',G[k]===key?'on':'',lab);b.onclick=()=>{G[k]=key;fillFind();draw(true)};c.append(b)};mk(null,'Any');arr.forEach(z=>mk(z.key,z.lab));if(!arr.length&&empty)c.append(el('span','hint',empty))}
+function fillFindOld(){const Z=zones();['lvl','nb','eb'].forEach(k=>{if(G[k]!=null&&!Z[k].some(z=>z.key===G[k]))G[k]=null});chipRow('#lchips',Z.lvl,'lvl');chipRow('#nchipsF',Z.nb,'nb');chipRow('#echips',Z.eb,'eb')}
+
+/* ---------- where is it: plain-language answer + maps ---------- */
+const NS='http://www.w3.org/2000/svg';
+function sv(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e}
+function worldSegs(pcs){return pcs.map(p=>{const q=S.nodes[p.i],P=R.pos[q.parent],C=R.pos[p.i];return{i:p.i,a:[0,1,2].map(k=>P[k]+(C[k]-P[k])*p.t0),b:[0,1,2].map(k=>P[k]+(C[k]-P[k])*p.t1)}})}
+function ext(segs,k){let lo=1e18,hi=-1e18;segs.forEach(s=>{lo=Math.min(lo,s.a[k],s.b[k]);hi=Math.max(hi,s.a[k],s.b[k])});return[lo,hi]}
+function ftl(v){return Math.round(v/12)+"'"}
+function cellsOf(lo,hi,off,w){let c0=Math.floor((lo-off)/w+1e-9),c1=Math.ceil((hi-off)/w-1e-9)-1;if(c1<c0)c1=c0;return[c0,c1]}
+function lines(lo,hi,off,w,maxn){let a=Math.floor((lo-off)/w+1e-9),b=Math.ceil((hi-off)/w-1e-9);if(b<=a)b=a+1;let st=1;while((b-a)/st>maxn)st++;const o=[];for(let i=a;;i+=st){o.push(off+i*w);if(i>=b)break}return o}
+function drawMap(host,all,sel,zone,cfg){
+ const W=320,H=cfg.h,ML=46,MR=10,MT=10,MB=20,pw=W-ML-MR,ph=H-MT-MB;
+ const xr=ext(all,cfg.xk),yr=ext(all,cfg.yk);
+ const xl=lines(xr[0],xr[1],cfg.xo,cfg.xw,6),yl=lines(yr[0],yr[1],cfg.yo,cfg.yw,6);
+ const x0=xl[0],x1=xl[xl.length-1],y0=yl[0],y1=yl[yl.length-1];
+ const sc=Math.min(pw/(x1-x0),ph/(y1-y0)),ox=ML+(pw-(x1-x0)*sc)/2,oy=MT+(ph-(y1-y0)*sc)/2;
+ const X=v=>ox+(v-x0)*sc,Y=v=>oy+(y1-v)*sc;
+ const svg=sv('svg',{viewBox:'0 0 '+W+' '+H,role:'img','aria-label':cfg.alt});
+ const zx=zone[cfg.xl],zy=zone[cfg.yl];
+ if(zx||zy){const a=zx?Math.max(zx[0],x0):x0,b=zx?Math.min(zx[1],x1):x1,c=zy?Math.max(zy[0],y0):y0,d=zy?Math.min(zy[1],y1):y1;
+  if(b>a&&d>c)svg.append(sv('rect',{x:X(a),y:Y(d),width:(b-a)*sc,height:(d-c)*sc,fill:'var(--acc)',opacity:.18,stroke:'var(--acc)','stroke-width':1.5,'stroke-dasharray':'4 3'}))}
+ xl.forEach(v=>{svg.append(sv('line',{x1:X(v),y1:Y(y0),x2:X(v),y2:Y(y1),stroke:'var(--ln)','stroke-width':1}));svg.append(sv('text',{x:X(v),y:H-6,'text-anchor':'middle','font-size':9.5,fill:'var(--mut)','font-family':'var(--mono)'},cfg.xt(v)))});
+ yl.forEach(v=>{svg.append(sv('line',{x1:X(x0),y1:Y(v),x2:X(x1),y2:Y(v),stroke:'var(--ln)','stroke-width':1}));svg.append(sv('text',{x:ML-5,y:Y(v)+3,'text-anchor':'end','font-size':9.5,fill:'var(--mut)','font-family':'var(--mono)'},cfg.yt(v)))});
+ if(cfg.bands)for(let i=0;i<yl.length-1;i++)svg.append(sv('text',{x:ML+4,y:Y((yl[i]+yl[i+1])/2)+3,'font-size':9,fill:'var(--mut)',opacity:.8},cfg.bands(yl[i])));
+ all.forEach(s=>svg.append(sv('line',{x1:X(s.a[cfg.xk]),y1:Y(s.a[cfg.yk]),x2:X(s.b[cfg.xk]),y2:Y(s.b[cfg.yk]),stroke:'var(--mut)','stroke-width':2.5,'stroke-linecap':'round',opacity:.55})));
+ sel.forEach(s=>svg.append(sv('line',{x1:X(s.a[cfg.xk]),y1:Y(s.a[cfg.yk]),x2:X(s.b[cfg.xk]),y2:Y(s.b[cfg.yk]),stroke:'var(--acc)','stroke-width':4.5,'stroke-linecap':'round'})));
+ host.append(svg)}
+
+function parseFeet(s){s=String(s==null?'':s).trim().replace(/^(el|n|e)\s*[:=]?\s*/i,'').replace(/,/g,'');if(!s)return NaN;if(/^[+-]?\d+(\.\d+)?$/.test(s))return parseFloat(s)*12;return dim(s)}
+function meCard(ef){
+ const box=el('div','me');box.append(el('div','mt','Where are you?'),el('div','ms','Type the N and E numbers on the column or beam nearest you. The app works out which way to walk.'));
+ const g=el('div','megrid'),mk=(k,lab,ph)=>{const w=el('div');w.append(el('label','lbl',lab));const i=document.createElement('input');i.inputMode='decimal';i.placeholder=ph;i.value=(S.me&&S.me[k])||'';i.setAttribute('aria-label',lab);i.autocomplete='off';w.append(i);g.append(w);return i};
+ const iN=mk('N','North (N)','8350'),iE=mk('E','East (E)','12420'),iZ=mk('Z','Height (EL)','170'),out=el('div','meout');box.append(g,out);
+ const AX=[{k:1,key:'N',pos:'North',neg:'South',ar:['↑','↓'],note:'higher N numbers',note2:'lower N numbers'},{k:0,key:'E',pos:'East',neg:'West',ar:['→','←'],note:'higher E numbers',note2:'lower E numbers'},{k:2,key:'Z',pos:'Up',neg:'Down',ar:['↑','↓'],note:'',note2:''}];
+ const run=()=>{S.me={N:iN.value,E:iE.value,Z:iZ.value};save();out.innerHTML='';
+  const mine={N:parseFeet(iN.value),E:parseFeet(iE.value),Z:parseFeet(iZ.value)},ax=AX.filter(a=>isFinite(mine[a.key])&&ef(a.k));
+  if(!ax.length)return;
+  const rows=ax.map(a=>{const r=ef(a.k),v=mine[a.key],d=v<r[0]?r[0]-v:v>r[1]?-(v-r[1]):0;return{a,d}});
+  const far=rows.filter(x=>Math.abs(x.d)>=12);
+  const word=x=>(x.d>0?x.a.pos:x.a.neg)+' '+fmtFI(Math.abs(x.d));
+  const vd=el('div','verdict'+(far.length?'':' ok'),far.length?'Go '+far.map(word).join(', then '):'You are in the right area. Look around you.');out.append(vd);
+  const tl=el('div','tiles');rows.forEach(x=>{const inn=Math.abs(x.d)<12,t=el('div','tile'+(inn?' in':''));t.append(el('div','tk',x.a.pos+(x.a.key==='Z'?' / Down':' / '+x.a.neg)));t.append(el('div','tv',inn?'In range':x.a.ar[x.d>0?0:1]+' '+fmtFI(Math.abs(x.d))));t.append(el('div','ts',inn?'no move needed':x.a.key==='Z'?(x.d>0?'climb to the pipe’s height':'drop to the pipe’s height'):'toward '+(x.d>0?x.a.note:x.a.note2)));tl.append(t)});out.append(tl);
+  const nts=(S.notes||[]).map((n,i)=>({L:String.fromCharCode(65+i%26),n})).filter(o=>[o.n.E,o.n.N,o.n.Z].some(v=>isFinite(dim(v))));
+  if(nts.length){const ul=el('ul','ends');nts.forEach(o=>{const parts=AX.map(a=>{const tv=dim(o.n[a.key]),v=mine[a.key];if(!isFinite(tv)||!isFinite(v))return null;const d=tv-v;return Math.abs(d)<12?null:(d>0?a.pos:a.neg)+' '+fmtFI(Math.abs(d))}).filter(Boolean);ul.append(el('li',null,'To end '+o.L+': '+(parts.length?parts.join(', '):'you are at it')))});out.append(el('div','ms','Distance to each printed end:'),ul)}};
+ [iN,iE,iZ].forEach(i=>i.oninput=run);run();return box}
+function renderWhere(){const h=$('#where');if(!h)return;h.innerHTML='';
+ const mode=R?findMode():'none';window.__LOC='';window.__WH=null;
+ {const f=document.querySelector('.filt');if(f)f.hidden=mode!=='trace';$('#trrow').hidden=mode!=='notes'||!!readCtl}
+ if(mode==='none'){h.append(el('div','wt','No coordinates yet. Read the iso in step 1 (Claude finds the printed coordinates), or trace the pipe in step 2.'));return}
+ const zone=mode==='trace'?curZone():{},pcs=mode==='trace'?pieces(zone):[],all=mode==='trace'?worldSegs(pieces({})):[],sel=worldSegs(pcs),narrowed=mode==='trace'&&(G.lvl!=null||G.nb!=null||G.eb!=null);
+ const ef=k=>mode==='trace'?(sel.length?ext(sel,k):null):range(k);
+ if(mode==='trace'&&!sel.length){h.append(el('div','wt','No pipe passes through this area. Pick a different floor or column below, or choose Any.'))}
+ else{
+  h.append(el('p','wl',mode==='notes'?'The pipe ends printed on the iso are here':narrowed?'The pipe inside the area you picked':'The whole pipe you traced'));
+  const tiles=el('div','tiles');h.append(tiles);
+  const tile=(k,v,sub)=>{const t=el('div','tile');t.append(el('div','tk',k),el('div','tv',v));if(sub)t.append(el('div','ts',sub));tiles.append(t)};
+  const zr=ef(2),b=LEVEL_BASE*12,lw=LEVEL_H*12;let lvl='?',lvlFt='',elT='no elevation printed';
+  if(zr){const[l0,l1]=cellsOf(zr[0],zr[1],b,lw);
+   lvl=l1<0?'Below '+LEVEL_BASE+"'":(l0===l1?'Level '+(l0+1):'Levels '+(Math.max(l0,0)+1)+'–'+(l1+1));
+   lvlFt=l1<0?'':(LEVEL_BASE+Math.max(l0,0)*LEVEL_H)+"'–"+(LEVEL_BASE+(l1+1)*LEVEL_H)+"'";
+   elT=zr[1]-zr[0]<1?'EL '+fmtFI(zr[0]):'EL '+fmtFI(zr[0])+' to '+fmtFI(zr[1])}
+  tile('Floor',lvl,lvlFt?'floor '+lvlFt+' · '+elT:elT);
+  const cols={};
+  const ax=(k,L,sp,name)=>{const r=ef(k);if(!r){tile(name,'?','no '+L+' printed');return}
+   const w=sp*12,[c0,c1]=cellsOf(r[0],r[1],0,w),a0=Math.round(c0*sp),a1=Math.round((c1+1)*sp);
+   cols[L]=[a0,a1];
+   tile(name,a0+"'–"+a1+"'",r[1]-r[0]<1?L+' '+fmtFI(r[0]):L+' '+fmtFI(r[0])+' to '+fmtFI(r[1]))};
+  ax(1,'N',S.nsp,'North');ax(0,'E',S.esp,'East');
+  const rg=L=>cols[L]?L+' '+cols[L][0]+"' and "+L+' '+cols[L][1]+"'":null;
+  window.__LOC=[lvl+(lvlFt?' ('+lvlFt+')':''),elT,cols.N?'N '+cols.N[0]+"'–"+cols.N[1]+"'":'',cols.E?'E '+cols.E[0]+"'–"+cols.E[1]+"'":''].filter(Boolean).join(' | ');
+  const names=[rg('N'),rg('E')].filter(Boolean);
+  const sentence=names.length?'On site: look for the columns marked '+names.join(', and ')+'. The pipe is in the space between them'+(zr?', up on '+lvl.toLowerCase():'')+'.':'';
+  window.__WH={lvl,sub:lvlFt?'floor '+lvlFt+' - '+elT:elT,N:cols.N||null,E:cols.E||null,Nsub:ef(1)?(ef(1)[1]-ef(1)[0]<1?'N '+fmtFI(ef(1)[0]):'N '+fmtFI(ef(1)[0])+' to '+fmtFI(ef(1)[1])):'',Esub:ef(0)?(ef(0)[1]-ef(0)[0]<1?'E '+fmtFI(ef(0)[0]):'E '+fmtFI(ef(0)[0])+' to '+fmtFI(ef(0)[1])):'',sentence,near:''};
+  {const near=[],chk=(r,off,w,nm)=>{if(!r)return;const lo=r[0]-off,hi=r[1]-off,c0=Math.floor(lo/w+1e-9),c1=Math.ceil(hi/w-1e-9)-1;const dLo=lo-c0*w,dHi=(Math.max(c1,c0)+1)*w-hi;if(dLo<36)near.push(nm+' is only '+fmtIn(Math.max(0,dLo))+' inside the lower line');if(dHi<36)near.push(nm+' is only '+fmtIn(Math.max(0,dHi))+' inside the upper line')};
+   chk(zr,b,lw,'Height');chk(ef(1),0,S.nsp*12,'North');chk(ef(0),0,S.esp*12,'East');
+   if(near.length){const nt='Close to an edge: '+near.join('; ')+'. Look just past it too.';if(window.__WH)window.__WH.near=nt;h.append(el('div','wt',nt))}}
+  if(names.length)h.append(el('div','wt','On site: look for the columns marked '+names.join(', and ')+'. The pipe is in the space between them'+(zr?', up on '+lvl.toLowerCase():'')+'.'))}
+ h.append(meCard(ef));
+ if(mode==='notes'){
+  const P=NOTEPTS();let warn=false;[0,1].forEach(k=>{const r=range(k);if(r&&r[1]-r[0]>400*12)warn=true});
+  if(warn)h.append(el('div','bad','These coordinates are far apart for one pipe. A number may be misread. Check the list below against the iso.'));
+  h.append(el('div','cap','Based on the coordinates printed at the pipe ends. The route between them is not traced, so the pipe could bulge a little past these ranges.'));
+  const d=el('details');d.open=true;d.append(el('summary',null,'Coordinates read from the iso (check these)'));const ul=el('ul','runs');
+  S.notes.forEach((n,i)=>{const L=String.fromCharCode(65+i%26);ul.append(el('li',null,L+'  '+n.label+'  |  E '+(n.E||'?')+'  |  N '+(n.N||'?')+'  |  EL '+(n.Z||'?')))});
+  d.append(ul);h.append(d);return}
+ const cap1=el('div','cap','Top view. Up is North, right is East. Orange is the pipe you are looking for; the shaded box is the area you picked.');
+ const m1=el('div');drawMap(m1,all,sel,zone,{h:210,xk:0,yk:1,xo:0,yo:0,xw:S.esp*12,yw:S.nsp*12,xl:'E',yl:'N',xt:v=>'E '+ftl(v),yt:v=>'N '+ftl(v),alt:'Top view of the pipe'});
+ h.append(el('label','lbl','Top view'),m1,cap1);
+ const m2=el('div');drawMap(m2,all,sel,zone,{h:150,xk:0,yk:2,xo:0,yo:LEVEL_BASE*12,xw:S.esp*12,yw:LEVEL_H*12,xl:'E',yl:'Z',xt:v=>'E '+ftl(v),yt:v=>"EL "+ftl(v),bands:v=>'Level '+(Math.round((v-LEVEL_BASE*12)/(LEVEL_H*12))+1),alt:'Side view of the pipe'});
+ h.append(el('label','lbl','Side view'),m2,el('div','cap','Side view, looking North. Up is higher. Floors are every 20 feet.'));
+ if(sel.length){const d=el('details');d.append(el('summary',null,'Pipe run by run'));const ul=el('ul','runs');
+  sel.forEach(s=>{const f=k=>{const a=s.a[k],c=s.b[k];return Math.abs(a-c)<1?fmtFI(a):fmtFI(a)+' → '+fmtFI(c)};ul.append(el('li',null,'#'+(s.i+1)+'  E '+f(0)+' | N '+f(1)+' | EL '+f(2)))});
+  d.append(ul);h.append(d)}}
+$('#pdf1').onclick=()=>savePdf($('#pdf1'));
+$('#totrace').onclick=()=>{if(sampleFn&&img)runTrace();else go('trace')};$('#tocheck').onclick=()=>go('check');
+$('#copyloc').onclick=async()=>{const t=window.__LOC||'';const b=$('#copyloc');if(!t){b.textContent='Nothing to copy yet';setTimeout(()=>b.textContent='Copy location',1600);return}
+ let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){try{const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.append(a);a.select();ok=document.execCommand('copy');a.remove()}catch(e2){}}
+ b.textContent=ok?'Copied':t;setTimeout(()=>b.textContent='Copy location',2200)};
+
+const KINDS=[
+ ['mark','Walk the pipe in order','Circled numbers on the drawing, from the start of the line to the end. Find each one on the real pipe. If a number has no name, the material list was not in the photo: look that number up in the material list printed on the iso.'],
+ ['pipe','Pipe','The straight pipe itself. Check size and wall thickness (schedule).'],
+ ['elbow','Elbows (90s and 45s)','Fittings that turn the pipe. Check the angle and size.'],
+ ['tee','Tees','Fittings where a branch pipe joins the main pipe.'],
+ ['reducer','Reducers','Fittings that change the pipe size.'],
+ ['fitting','Other fittings','Couplings, caps, plugs and branch connections.'],
+ ['valve','Valves','Check the type, size and which way it faces.'],
+ ['flange','Flanges','Bolted joints. Check size, rating (class) and face type.'],
+ ['gasket','Gaskets','One goes between each pair of flanges. Check type and size.'],
+ ['bolt','Bolts and nuts','Count them per joint. Check length and material.'],
+ ['tag','Tags on the drawing (J1, J2 ...)','Labeled points on the drawing. Find each tag on the real line.'],
+ ['support','Supports','Shoes, clamps and guides that hold the pipe.'],
+ ['weld','Welds','Each weld on the list. F is a field weld, S is a shop weld.'],
+ ['cut','Cut pipe lengths','Each piece of pipe and the length to cut it.'],
+ ['instrument','Instruments','Gauges, transmitters and other devices.'],
+ ['other','Other','Anything else, including items you added.']];
+function listItems(){return S.list&&Array.isArray(S.list.items)?S.list.items:[]}
+function listDone(){const a=listItems();return a.length>0&&a.every(x=>x.done)}
+function importList(d,append,crop){const a=Array.isArray(d&&d.items)?d.items:[],old=listItems(),prev=new Map(old.map(x=>[x.kind+'|'+x.ref+'|'+x.desc,x.done])),seen=new Set(),out=append?old.slice():[];
+ if(append)old.forEach(x=>seen.add(x.kind+'|'+x.ref+'|'+x.desc));
+ a.forEach(x=>{if(!x)return;let kind=String(x.kind||'other').toLowerCase();if(!KINDS.some(k=>k[0]===kind))kind='other';const ref=clean(x.ref),desc=clean(x.desc),what=clean(x.what);if(!ref&&!desc&&!what)return;
+  const key=kind+'|'+ref+'|'+desc;if(seen.has(key))return;seen.add(key);const px=+x.x,py=+x.y,loc=crop&&isFinite(px)&&isFinite(py)&&x.x!=null&&x.y!=null;out.push({id:out.length+1,kind,ref,desc,what,size:clean(x.size),qty:clean(x.qty),done:!!prev.get(key),u:loc?crop.x+Math.max(0,Math.min(1000,px))/1000*crop.w:null,v:loc?crop.y+Math.max(0,Math.min(1000,py))/1000*crop.h:null})});
+ S.list={line:clean(d&&d.line)||(append&&S.list?S.list.line:''),items:out};save();return out.length}
+function normTables(a){const o=[];(Array.isArray(a)?a:[]).forEach(t=>{if(!t)return;const c=v=>Math.max(0,Math.min(1000,+v)),b={x0:c(t.x0),y0:c(t.y0),x1:c(t.x1),y1:c(t.y1),name:String(t.name||'')};
+  if(![b.x0,b.y0,b.x1,b.y1].every(isFinite)||b.x1-b.x0<30||b.y1-b.y0<30)return;b.area=(b.x1-b.x0)*(b.y1-b.y0);o.push(b)});
+ o.sort((p,q)=>(p.name==='title')-(q.name==='title')||q.area-p.area);const out=[];
+ o.forEach(b=>{if(out.some(c=>{const w=Math.min(b.x1,c.x1)-Math.max(b.x0,c.x0),h=Math.min(b.y1,c.y1)-Math.max(b.y0,c.y0);return w>0&&h>0&&w*h>.7*Math.min(b.area,c.area)}))return;out.push(b)});return out}
+async function runList(sig){
+ const k=Math.min(1,4200/Math.max(img.width,img.height)),W=Math.max(1,Math.round(img.width*k)),H=Math.max(1,Math.round(img.height*k));
+ const base=document.createElement('canvas');base.width=W;base.height=H;const bx=base.getContext('2d');bx.imageSmoothingQuality='high';bx.drawImage(img,0,0,W,H);try{enhance(base)}catch(e){}
+ let boxes=[];
+ try{const ov=await cblob(base,1500);const r=await sampleFn.json(P6,{images:[ov],modelTier:'default',signal:sig});boxes=normTables(r&&r.tables)}catch(e){if(e&&FATAL.includes(e.code))throw e}
+ let imgs=[],focused=false;
+ if(boxes.length){focused=true;for(const b of boxes.slice(0,Math.max(1,Math.min(5,MAXIMG)))){const mx=.02*(b.x1-b.x0),my=.02*(b.y1-b.y0),x0=Math.max(0,b.x0-mx)/1000*W,y0=Math.max(0,b.y0-my)/1000*H,x1=Math.min(1000,b.x1+mx)/1000*W,y1=Math.min(1000,b.y1+my)/1000*H;
+   const t=document.createElement('canvas'),sc=Math.min(2.2,2000/Math.max(x1-x0,y1-y0));t.width=Math.max(1,Math.round((x1-x0)*sc));t.height=Math.max(1,Math.round((y1-y0)*sc));const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(base,x0,y0,x1-x0,y1-y0,0,0,t.width,t.height);imgs.push(await cblob(t,2000))}}
+ else{const full=await makeSet(img,0,0,img.width,img.height,MAXIMG);imgs=full.blobs}
+ const r1=await sampleFn.json(P5(imgs.length,focused),{images:imgs,modelTier:'complex',signal:sig});importList(r1);
+ if(!LASTIMGS&&LAST){try{LASTIMGS=await makeSet(img,LAST.x,LAST.y,LAST.w,LAST.h,MAXIMG)}catch(e){}}
+ if(LASTIMGS){const ctx=listItems().filter(x=>['pipe','elbow','tee','reducer','fitting','valve','flange','gasket','bolt','instrument'].includes(x.kind)&&x.ref).slice(0,60).map(x=>x.ref+': '+(x.desc||x.what||'').slice(0,60)).join('\n');
+  try{const r2=await sampleFn.json(P7(LASTIMGS,ctx),{images:LASTIMGS.blobs,modelTier:'complex',signal:sig});importList(r2,true,LAST)}catch(e){if(e&&(e.code==='cancelled'||FATAL.includes(e.code)))throw e}}
+ return listItems().length}
+async function readListOnly(){if(!sampleFn||!img||readCtl)return;readCtl=new AbortController();$('#cbusy').hidden=false;renderCheck();
+ try{const n=await runList(readCtl.signal);if(!n)anote='Claude could not find any lists on this sheet. Add items by hand below.'}
+ catch(e){const c=e&&e.code;if(c!=='cancelled')anote=ERR[c]||'Something went wrong reading the lists. Try again.'}
+ finally{readCtl=null;$('#cbusy').hidden=true;refreshAuto();update()}}
+$('#cstop').onclick=()=>{if(readCtl)readCtl.abort()};
+function remainingText(){const L=listItems().filter(x=>!x.done);return (S.list&&S.list.line?S.list.line+'\n':'')+'Still to check ('+L.length+'):\n'+L.map(x=>'- '+[x.ref,x.desc,x.size,x.qty].filter(Boolean).join('  ')).join('\n')}
+function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('#dock').scrollTop;c.innerHTML='';const L=listItems(),done=L.filter(x=>x.done).length;
+ if(!L.length){const w=el('div','wt');w.append(el('p',null,readCtl?'Reading the lists on the sheet…':'No list yet. Claude reads the material list, cut pipe lengths, welds and supports from the sheet so you can check them off while you walk the line.'));
+  if(sampleFn&&img&&!readCtl){const b=el('button','pri','Read the lists from this photo');b.onclick=readListOnly;w.append(b)}
+  else if(!img)w.append(el('p','hint','Add a photo in step 1 first.'));
+  c.append(w)}
+ else{
+  const hd=el('div','cp');hd.append(el('div','cl',done+' of '+L.length+' checked'));if(S.list&&S.list.line)hd.append(el('div','cs',S.list.line));
+  const m=el('div','meter');const bar=el('i');bar.style.width=Math.round(done/L.length*100)+'%';m.append(bar);hd.append(m);c.append(hd);
+  const tl=el('div','tools');
+  const hb=el('button',S.hideDone?'on':'',S.hideDone?'Show checked':'Hide checked');hb.onclick=()=>{S.hideDone=!S.hideDone;save();renderCheck()};
+  const cb=el('button',null,'Copy what is left');cb.onclick=async()=>{const t=remainingText();let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){try{const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.append(a);a.select();ok=document.execCommand('copy');a.remove()}catch(e2){}}cb.textContent=ok?'Copied':'Could not copy';setTimeout(()=>cb.textContent='Copy what is left',1800)};
+  const rb=el('button',null,'Clear checks');rb.onclick=()=>{if(rb.dataset.arm){L.forEach(x=>x.done=false);save();renderCheck()}else{rb.dataset.arm=1;rb.textContent='Tap again to clear';setTimeout(()=>{rb.dataset.arm='';rb.textContent='Clear checks'},2500)}};
+  tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);
+  KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;const gd=g.filter(x=>x.done).length;
+   const vis=S.hideDone?g.filter(x=>!x.done):g;if(!vis.length)return;
+   const d=el('details');d.open=true;const sm=el('summary');sm.append(document.createTextNode(name));sm.append(el('span','n',gd+'/'+g.length));d.append(sm);if(hint)d.append(el('p','gh',hint));
+   vis.forEach(x=>{const row=el('label','ci'+(x.done?' done':''));const cbx=document.createElement('input');cbx.type='checkbox';cbx.checked=x.done;cbx.setAttribute('aria-label',[x.ref,x.desc].filter(Boolean).join(' '));
+    cbx.onchange=()=>{x.done=cbx.checked;row.classList.toggle('done',x.done);save();const n=L.filter(y=>y.done).length;hd.firstChild.textContent=n+' of '+L.length+' checked';bar.style.width=Math.round(n/L.length*100)+'%';sm.querySelector('.n').textContent=g.filter(y=>y.done).length+'/'+g.length;update2();if(S.hideDone)setTimeout(renderCheck,350)};
+    const t=el('div');const ct=el('div','ct');if(x.ref)ct.append(el('b',null,x.ref));ct.append(document.createTextNode(x.what||x.desc||''));t.append(ct);
+    const meta=[x.what&&x.desc&&x.desc!==x.what?x.desc:'',x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('  ·  ');if(meta)t.append(el('div','cm',meta));
+    row.append(cbx,t);d.append(row)});
+   c.append(d)})}
+ const f=el('form','addrow');const inp=document.createElement('input');inp.placeholder='Add something that is missing';inp.setAttribute('aria-label','Add an item');const ab=el('button',null,'Add');ab.type='submit';f.append(inp,ab);
+ f.onsubmit=e=>{e.preventDefault();const v=inp.value.trim();if(!v)return;if(!S.list)S.list={line:'',items:[]};const it=S.list.items;it.push({id:it.length+1,kind:'other',ref:'',desc:v,size:'',qty:'',done:false});save();renderCheck()};
+ c.append(f);$('#dock').scrollTop=keepScroll}
+function update2(){const L=listItems(),n=L.filter(x=>x.done).length;document.querySelectorAll('.steps button').forEach(b=>{if(b.dataset.t==='check'){const dn=listDone();b.classList.toggle('done',dn);b.querySelector('i').textContent=dn?'✓':'3'}})}
+/* ---------- save a PDF: tiny built-in writer, no libraries, works offline ---------- */
+const HW=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+const HB=[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+function pdfSafe(s){return String(s==null?'':s).replace(/[–—]/g,'-').replace(/[·•]/g,'-').replace(/→/g,'->').replace(/[‘’′]/g,"'").replace(/[“”″]/g,'"').replace(/…/g,'...').replace(/[^\x20-\x7e -ÿ\n]/g,'')}
+class MiniPDF{
+ constructor(){this.W=612;this.H=792;this.pages=[];this.imgs=[];this.newPage()}
+ newPage(){this.cur={ops:[],imgs:new Set()};this.pages.push(this.cur)}
+ col(h){h=String(h||'#000000').replace('#','');return[0,2,4].map(i=>(parseInt(h.substr(i,2),16)/255).toFixed(3)).join(' ')}
+ esc(s){let o='';for(const ch of pdfSafe(s)){const c=ch.charCodeAt(0);o+=(ch==='('||ch===')'||ch==='\\')?'\\'+ch:(c>126?'\\'+c.toString(8).padStart(3,'0'):ch)}return o}
+ width(s,size,font){s=pdfSafe(s);if(font==='M')return s.length*size*.6;const T=font==='B'?HB:HW;let w=0;for(const ch of s){const c=ch.charCodeAt(0);w+=(c>=32&&c<=126?T[c-32]:556)}return w*size/1000}
+ wrap(s,maxW,size,font){const out=[];pdfSafe(s).split('\n').forEach(par=>{let line='';par.split(/\s+/).filter(Boolean).forEach(w=>{const t=line?line+' '+w:w;if(this.width(t,size,font)<=maxW||!line)line=t;else{out.push(line);line=w}});out.push(line)});return out}
+ text(s,x,y,size,font,color){const F={R:'F1',B:'F2',M:'F3'}[font||'R'];this.cur.ops.push('BT /'+F+' '+size+' Tf '+this.col(color)+' rg '+x.toFixed(1)+' '+(this.H-y).toFixed(1)+' Td ('+this.esc(s)+') Tj ET')}
+ rect(x,y,w,h,o){o=o||{};let op=[];if(o.fill)op.push(this.col(o.fill)+' rg');if(o.stroke)op.push(this.col(o.stroke)+' RG '+(o.lw||.8)+' w');op.push(x.toFixed(1)+' '+(this.H-y-h).toFixed(1)+' '+w.toFixed(1)+' '+h.toFixed(1)+' re '+(o.fill&&o.stroke?'B':o.fill?'f':'S'));this.cur.ops.push(op.join(' '))}
+ line(x1,y1,x2,y2,color,lw){this.cur.ops.push(this.col(color)+' RG '+(lw||.8)+' w '+x1.toFixed(1)+' '+(this.H-y1).toFixed(1)+' m '+x2.toFixed(1)+' '+(this.H-y2).toFixed(1)+' l S')}
+ image(bytes,pw,ph,x,y,w,h){this.imgs.push({bytes,pw,ph});const n=this.imgs.length;this.cur.imgs.add(n);this.cur.ops.push('q '+w.toFixed(1)+' 0 0 '+h.toFixed(1)+' '+x.toFixed(1)+' '+(this.H-y-h).toFixed(1)+' cm /Im'+n+' Do Q')}
+ save(){const parts=[],off=[];let len=0;const enc=new TextEncoder();
+  const push=u=>{const b=typeof u==='string'?enc.encode(u):u;parts.push(b);len+=b.length};
+  const obj=(n,body)=>{off[n]=len;push(n+' 0 obj\n');push(body);push('\nendobj\n')};
+  const nP=this.pages.length,fontIds=[3,4,5],imgBase=6,pageBase=imgBase+this.imgs.length;
+  push('%PDF-1.4\n');
+  obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2,'<< /Type /Pages /Kids ['+this.pages.map((_,i)=>(pageBase+i*2)+' 0 R').join(' ')+'] /Count '+nP+' >>');
+  obj(3,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  obj(4,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  obj(5,'<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>');
+  this.imgs.forEach((im,i)=>{const n=imgBase+i;off[n]=len;push(n+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+im.pw+' /Height '+im.ph+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+im.bytes.length+' >>\nstream\n');push(im.bytes);push('\nendstream\nendobj\n')});
+  this.pages.forEach((pg,i)=>{const pid=pageBase+i*2,cid=pid+1,stream=pg.ops.join('\n');
+   obj(pid,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+this.W+' '+this.H+'] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> /XObject << '+[...pg.imgs].map(n=>'/Im'+n+' '+(imgBase+n-1)+' 0 R').join(' ')+' >> >> /Contents '+cid+' 0 R >>');
+   obj(cid,'<< /Length '+enc.encode(stream).length+' >>\nstream\n'+stream+'\nendstream')});
+  const total=pageBase+nP*2,xr=len;push('xref\n0 '+total+'\n0000000000 65535 f \n');
+  for(let n=1;n<total;n++)push(String(off[n]).padStart(10,'0')+' 00000 n \n');
+  push('trailer\n<< /Size '+total+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF');
+  return new Blob(parts,{type:'application/pdf'})}}
+const KCOL={mark:'#1558e8',tag:'#12a150',support:'#8a3ffc',valve:'#d92d20',tee:'#0e9aa7',elbow:'#0e9aa7',reducer:'#0e9aa7',fitting:'#0e9aa7',instrument:'#c026d3',flange:'#6b7280',gasket:'#6b7280',bolt:'#6b7280',weld:'#6b7280',pipe:'#6b7280',cut:'#6b7280',other:'#6b7280'};
+const KLEG={mark:'Circled numbers',tag:'Tags (J1, J2 ...)',support:'Supports',valve:'Valves',tee:'Tees, elbows, fittings',instrument:'Instruments'};
+function itemLabel(it){return String(it.ref||it.what||'').slice(0,7)}
+function located(){return listItems().filter(it=>it.u!=null&&it.v!=null)}
+function paintItems(x,X,Y,fs,faded){located().forEach(it=>{const px=X(it.u),py=Y(it.v),c=KCOL[it.kind]||'#6b7280',dn=faded&&it.done;x.save();x.globalAlpha=dn?.3:1;
+  x.beginPath();x.arc(px,py,fs*.8,0,7);x.fillStyle=c+'33';x.fill();x.lineWidth=Math.max(2.5,fs/7);x.strokeStyle=c;x.stroke();
+  const t=itemLabel(it);x.font='bold '+fs*.8+'px sans-serif';const w=x.measureText(t).width,bx=px+fs*.7,by=py-fs*1.5;
+  x.fillStyle=c;x.beginPath();if(x.roundRect)x.roundRect(bx-4,by-fs*.75,w+8,fs*.95,5);else x.rect(bx-4,by-fs*.75,w+8,fs*.95);x.fill();x.fillStyle='#fff';x.fillText(t,bx,by-1);x.restore()})}
+async function pageJpeg(mode){ // the drawing with the note markers (and the traced route when there is one), as a JPEG
+ const r=LAST&&LAST.w>50?LAST:{x:0,y:0,w:img.width,h:img.height},k=Math.min(1,(mode==='items'?2000:1500)/Math.max(r.w,r.h)),W=Math.max(1,Math.round(r.w*k)),H=Math.max(1,Math.round(r.h*k));
+ const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(img,r.x,r.y,r.w,r.h,0,0,W,H);
+ const X=u=>(u-r.x)*k,Y=v=>(v-r.y)*k,acc='#f26a1b';
+ if(mode!=='items'&&findMode()==='trace'){try{const pc=pieces(curZone());x.strokeStyle=acc;x.lineWidth=Math.max(5,W/150);x.lineCap='round';x.globalAlpha=.9;pc.forEach(p=>{x.beginPath();x.moveTo(X(p.x0),Y(p.y0));x.lineTo(X(p.x1),Y(p.y1));x.stroke()});x.globalAlpha=1}catch(e){}}
+ const fs=Math.max(22,W/36);if(mode==='items'){paintItems(x,X,Y,fs,false)}else(S.notes||[]).forEach((n,i)=>{if(n.u==null)return;const L=String.fromCharCode(65+i%26),px=X(n.u),py=Y(n.v);if(px<-20||py<-20||px>W+20||py>H+20)return;
+  x.beginPath();x.arc(px,py,fs*.85,0,7);x.fillStyle='rgba(242,106,27,.28)';x.fill();x.lineWidth=Math.max(3,fs/6);x.strokeStyle=acc;x.stroke();
+  x.font='bold '+fs+'px sans-serif';x.lineWidth=fs/4;x.strokeStyle='#fff';x.strokeText(L,px+fs,py-fs*.5);x.fillStyle='#111';x.fillText(L,px+fs,py-fs*.5)});
+ const blob=await new Promise(ok=>c.toBlob(ok,'image/jpeg',.88));return{bytes:new Uint8Array(await blob.arrayBuffer()),w:W,h:H}}
+async function makePdf(){
+ const P=new MiniPDF(),W=P.W,H=P.H,M=40,CW=W-2*M,INK='#0b1a25',MUT='#566774',LN='#d3dce4',ACC='#f26a1b';let y=0;
+ const line=(S.list&&S.list.line)||'',wh=window.__WH,L=listItems();
+ const header=()=>{P.rect(0,0,W,50,{fill:INK});P.text('Iso check sheet',M,32,17,'B','#ffffff');if(line){const t=pdfSafe(line),w=P.width(t,8.5,'R');P.text(t,W-M-Math.min(w,300),31,8.5,'R','#c7d5de')}y=72};
+ const need=h=>{if(y+h>H-46){P.newPage();y=M}};
+ header();
+ if(wh){
+  P.text('Where the pipe is',M,y,13,'B',INK);y+=12;
+  const bw=(CW-16)/3,bh=70,items=[['Floor',wh.lvl,wh.sub],['North',wh.N?wh.N[0]+"'-"+wh.N[1]+"'":'?',wh.Nsub],['East',wh.E?wh.E[0]+"'-"+wh.E[1]+"'":'?',wh.Esub]];
+  items.forEach((it,i)=>{const bx=M+i*(bw+8),dark=i===0;P.rect(bx,y,bw,bh,{fill:dark?INK:'#eef2f5',stroke:dark?INK:LN});
+   P.text(it[0],bx+9,y+15,8.5,'B',dark?'#aab9c4':MUT);P.text(it[1],bx+9,y+38,it[1].length>10?15:19,'B',dark?'#ffffff':INK);
+   P.wrap(it[2]||'',bw-16,7,'R').slice(0,2).forEach((l,j)=>P.text(l,bx+9,y+54+j*9,7,'R',dark?'#aab9c4':MUT))});
+  y+=bh+14;
+  P.wrap(wh.sentence||'',CW,10,'R').forEach(l=>{P.text(l,M,y,10,'R',INK);y+=13});
+  if(wh.near){y+=3;P.wrap(wh.near,CW,9,'B').forEach(l=>{P.text(l,M,y,9,'B','#a84e07');y+=12})}
+  y+=6;
+  if(img){try{const j=await pageJpeg();let dw=CW,dh=dw*j.h/j.w;const maxH=H-y-150;if(dh>maxH){dh=Math.max(200,maxH);dw=dh*j.w/j.h}need(dh+10);P.image(j.bytes,j.w,j.h,M,y,dw,dh);P.rect(M,y,dw,dh,{stroke:LN});y+=dh+6;
+   if((S.notes||[]).length)P.text('Letters on the drawing mark where the coordinates below are printed.',M,y+3,8,'R',MUT);y+=14}catch(e){}}
+  if((S.notes||[]).length){need(30+S.notes.length*13);P.text('Coordinates printed on the iso',M,y+4,10.5,'B',INK);y+=18;
+   S.notes.forEach((n,i)=>{need(14);const t=String.fromCharCode(65+i%26)+'  '+(n.label||'Note')+'   E '+(n.E||'?')+'   N '+(n.N||'?')+'   EL '+(n.Z||'?');P.text(t,M,y,8.5,'M',INK);y+=13})}
+ }
+ if(located().length&&img){
+  try{const j=await pageJpeg('items');P.newPage();y=M;P.text('Where to look on the drawing',M,y+8,15,'B',INK);y+=22;
+   P.wrap('Each ring is something on your check list. The tag beside it is the number or name printed there. Positions are a best guess: always check against the drawing.',CW,9,'R').forEach(l=>{P.text(l,M,y,9,'R',MUT);y+=12});y+=4;
+   let dw=CW,dh=dw*j.h/j.w;if(dh>470){dh=470;dw=dh*j.w/j.h}P.image(j.bytes,j.w,j.h,M,y,dw,dh);P.rect(M,y,dw,dh,{stroke:LN});y+=dh+14;
+   const kinds=[...new Set(located().map(it=>['elbow','reducer','fitting'].includes(it.kind)?'tee':it.kind))];let lx=M;kinds.forEach(k=>{const nm=KLEG[k]||k,c=KCOL[k]||'#6b7280',w=P.width(nm,8.5,'R')+26;if(lx+w>W-M){lx=M;y+=14}P.rect(lx,y-8,9,9,{fill:c});P.text(nm,lx+14,y,8.5,'R',INK);lx+=w+10});y+=18;
+   const loc=located().filter(it=>it.kind!=='weld'),half=Math.ceil(loc.length/2),colW=CW/2;
+   [loc.slice(0,half),loc.slice(half)].forEach((col,ci)=>{let yy=y;col.forEach(it=>{if(yy>H-50)return;P.rect(M+ci*colW,yy-7,7,7,{fill:KCOL[it.kind]||'#6b7280'});P.text(itemLabel(it),M+ci*colW+12,yy,8.5,'M',INK);const t=(it.what||it.desc||'').slice(0,44);P.text(t,M+ci*colW+62,yy,8.5,'R',MUT);yy+=12})})}catch(e){}
+ }
+ if(L.length){
+  P.newPage();y=M;const done=L.filter(x=>x.done).length;
+  P.text('Check list',M,y+8,16,'B',INK);P.text(done+' of '+L.length+' checked',W-M-P.width(done+' of '+L.length+' checked',9,'R'),y+7,9,'R',MUT);y+=24;
+  KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;need(60);
+   P.rect(M,y,CW,19,{fill:'#e6ecf1'});P.text(name,M+8,y+13,10.5,'B',INK);const cnt=g.filter(x=>x.done).length+'/'+g.length;P.text(cnt,W-M-8-P.width(cnt,8,'R'),y+13,8,'R',MUT);y+=30;
+   if(hint){P.wrap(hint,CW,8,'R').forEach(l=>{P.text(l,M+2,y,8,'R',MUT);y+=10});y+=8}
+   g.forEach(x=>{const main=P.wrap(x.what||x.desc||'',330,9.5,'B'),sub=x.what&&x.desc&&x.desc!==x.what?P.wrap(x.desc,330,8,'R').slice(0,2):[],meta=P.wrap([x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('   '),104,8.5,'R'),
+     rows=Math.max(main.length*12+sub.length*10,meta.length*11)+8;need(rows+2);
+     P.rect(M+2,y-9,11,11,{stroke:INK,lw:1});if(x.done){P.line(M+4,y-3,M+7,y,INK,1.4);P.line(M+7,y,M+12,y-8,INK,1.4)}
+     if(x.ref)P.text(String(x.ref).slice(0,9),M+20,y,8,'M',MUT);
+     let yy=y;main.forEach(l=>{P.text(l,M+78,yy,9.5,'B',INK);yy+=12});sub.forEach(l=>{P.text(l,M+78,yy,8,'R',MUT);yy+=10});
+     meta.forEach((l,j)=>P.text(l,W-M-104,y+j*11,8.5,'R',INK));
+     y+=rows;P.line(M,y-8,W-M,y-8,'#e6ecf1',.6)});
+   y+=8})}
+ const n=P.pages.length;P.pages.forEach((pg,i)=>{P.cur=pg;P.text('Iso check sheet  -  page '+(i+1)+' of '+n,M,H-24,8,'R',MUT)});
+ return P.save()}
+async function savePdf(btn){
+ const old=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='Making the PDF...'}
+ try{const blob=await makePdf(),ln=(S.list&&S.list.line)||'',name='iso-check-sheet'+(ln?'-'+ln.replace(/[^A-Za-z0-9-]+/g,'_').slice(0,40):'')+'.pdf';
+  let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){}
+  if(dl){await dl.save({filename:name,data:blob})}
+  else{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.target='_blank';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
+  if(btn)btn.textContent='PDF ready'}
+ catch(e){if(btn)btn.textContent=(e&&e.code==='declined')?old:'Could not make the PDF'}
+ finally{if(btn){btn.disabled=false;setTimeout(()=>btn.textContent=old,2200)}}}
+function fillFind(){fillFindOld();renderWhere()}
+function curZone(){const Z=zones(),z={};const f=(k,ax)=>{if(G[k]==null)return;const o=Z[k].find(q=>q.key===G[k]);if(o)z[ax]=[o.lo,o.hi]};f('lvl','Z');f('nb','N');f('eb','E');return z}
+function pieces(zone){const out=[];S.nodes.forEach((q,i)=>{if(q.parent<0)return;const P=R.pos[q.parent],C=R.pos[i];if(!P||!C)return;let t0=0,t1=1,ok=true;
+ ['E','N','Z'].forEach((ax,k)=>{const z=zone[ax];if(!z)return;const x0=P[k],dx=C[k]-x0;if(Math.abs(dx)<1e-6){if(x0<z[0]-1e-6||x0>z[1]+1e-6)ok=false}else{let a1=(z[0]-x0)/dx,b1=(z[1]-x0)/dx;if(a1>b1){const t=a1;a1=b1;b1=t}t0=Math.max(t0,a1);t1=Math.min(t1,b1)}});
+ if(!ok||t0>t1+1e-9||(t1-t0<0.002&&Math.hypot(C[0]-P[0],C[1]-P[1],C[2]-P[2])>1e-6))return;
+ const p=S.nodes[q.parent];out.push({i,t0,t1,x0:p.u+(q.u-p.u)*t0,y0:p.v+(q.v-p.v)*t0,x1:p.u+(q.u-p.u)*t1,y1:p.v+(q.v-p.v)*t1})});return out}
+
+/* ---------- update + draw ---------- */
+function bannerKind(){const n=S.nodes.length;if(!img||tab==='photo')return'info';if(tab==='find')return findMode()!=='none'?'info':'warn';if(replacing!=null||n<2)return'info';if(R.issues.length)return'bad';if(R.pos.some(p=>!p))return'warn';return'ok'}
+function solvedRuns(){return S.nodes.filter((q,i)=>q.parent>=0&&R.pos[q.parent]&&R.pos[i]).length}
+function bannerText(){const n=S.nodes.length;
+ if(!img)return window.__STREAMLIT?'Add a photo in the box above to begin.':'Choose a photo of your iso to begin.';
+ if(tab==='photo')return readCtl?'Claude is reading the iso. You can keep this screen open.':'Tap Read the iso for me, or set the photo up by hand and trace the pipe yourself.';
+ if(tab==='find')return findMode()!=='none'?'Pick a level or a column to see where the pipe is inside it.':'No coordinates yet. Read the iso in step 1, or trace the pipe in step 2.';
+ if(replacing!=null)return'Tap the iso where point #'+(replacing+1)+' should go.';
+ if(!n)return'Tap the first point on the pipe: an end that has printed coordinates, like CONT ON or CONN TO.';
+ if(n===1&&!['E','N','Z'].some(a=>isFinite(dim(S.nodes[0][a]))))return'Type the printed coordinates for point #1 below. Then tap the next elbow or end of the pipe.';
+ if(R.issues.length)return'Something doesn\'t add up. See the red message below.';
+ if(n===1)return'Point #1 is set. Now tap the next elbow or end of the pipe.';
+ if(R.pos.some(p=>!p))return'Tap the next point. A point with a dashed outline needs a length on its run, or printed coordinates.';
+ return'All '+n+' points are solved. Keep tapping to add more, or go to step 3.'}
+function update(){R=solve();$('#padv').textContent=S.pad+' px';$('#banner').textContent=bannerText();
+ $('#banner').dataset.kind=bannerKind();$('#banner').hidden=tab==='check'||(tab==='find'&&findMode()!=='none');{const fb=$('#fbusy');if(fb)fb.hidden=!(readCtl&&tab==='find')}
+ {const ok3=S.nodes.length>1&&!R.issues.length&&R.pos.every(Boolean);$('#to3').className=ok3?'pri':'ghost'}
+ $('#cbusy').hidden=!(readCtl&&tab==='check');{$('#pdfrow').hidden=!(findMode()!=='none'||listItems().length);const n=listItems().length,b=$('#tocheck');if(b){$('#tocrow').hidden=!n;b.textContent='Open the checklist ('+n+' items)'}}
+ $('#chkrow').hidden=!(sampleFn&&LASTIMGS&&!readCtl&&(R.issues.length||R.pos.some(p=>!p)));
+ {const n0=S.nodes.length,all=n0>1&&!R.issues.length&&R.pos.every(Boolean);document.querySelectorAll('.steps button').forEach(b=>{const t=b.dataset.t,dn=(t==='photo'&&!!img)||(t==='find'&&findMode()!=='none')||(t==='check'&&listDone());b.classList.toggle('done',dn);b.querySelector('i').textContent=dn?'\u2713':({photo:1,find:2,check:3,trace:'\u2022'})[t]})}
+ const rE=$('#rE');if(rE&&sel!=null&&S.nodes[sel]){const v=R.val,f=a=>v[a][sel]==null?'?':fmtFI(v[a][sel]),bad=R.issues.some(s=>s.i===sel),ok=!!R.pos[sel]&&!bad;rE.textContent=f('E');$('#rN').textContent=f('N');$('#rZ').textContent=f('Z');const tg=$('#ctag');tg.textContent=ok?'Solved':bad?'Check':'Needs a length';tg.className='tag';tg.dataset.s=ok?'ok':bad?'bad':'warn'}
+ const L=$('#len');if(L&&sel!=null&&S.nodes[sel])L.placeholder=(R.len[sel]!=null&&String(S.nodes[sel].len||'').trim()==='')?'Worked out: '+fmtIn(R.len[sel]):'like 5\'7" or 2.1/2"';
+ document.querySelectorAll('#strip button').forEach(b=>{const i=+b.dataset.i;b.classList.toggle('warn',!R.pos[i]);b.classList.toggle('err',R.issues.some(s=>s.i===i))});
+ const t=$('#tst');t.innerHTML='';const n=S.nodes.length;
+ if(n){R.issues.forEach(s=>{const nm={E:'East',N:'North',Z:'elevation'}[s.a];t.append(el('div','bad',s.flip?'Run to #'+(s.i+1)+' goes the other way: the coordinates need '+NAME[flipDir(S.nodes[s.i].dir)]+'.':'At point #'+(s.i+1)+', '+nm+' is off by '+fmtIn(Math.abs(s.diff))+'. A length before this point, or its printed coordinates, is wrong.'))});
+  const un=R.pos.filter(p=>!p).length,anchors=S.nodes.filter(q=>['E','N','Z'].some(a=>isFinite(dim(q[a])))).length;
+  if(!un&&!R.issues.length&&n>1)t.append(el('div','ok',anchors>=2?'All '+n+' points solved and they match the printed coordinates.':'All '+n+' points solved. Type the far end\'s printed coordinates to double-check.'))}
+ if(tab==='find')fillFind();if(tab==='check'&&!readCtl)renderCheck();draw()}
+function draw(center){if(!img)return;cx.clearRect(0,0,cv.width,cv.height);cx.drawImage(img,0,0);const k=1/zoom,cs=getComputedStyle(document.documentElement);const acc=cs.getPropertyValue('--acc').trim(),pc=cs.getPropertyValue('--pt').trim();
+ const N=S.nodes;cx.lineJoin='round';cx.lineCap='round';
+ if(tab==='trace'){cx.strokeStyle=pc;cx.globalAlpha=.85;cx.lineWidth=2.5*k;N.forEach(q=>{if(q.parent<0)return;const p=N[q.parent];cx.beginPath();cx.moveTo(p.u,p.v);cx.lineTo(q.u,q.v);cx.stroke()});cx.globalAlpha=1;
+  if(sel!=null&&N[sel]&&N[sel].parent>=0){const q=N[sel],p=N[q.parent];cx.strokeStyle=acc;cx.lineWidth=6*k;cx.globalAlpha=.85;cx.beginPath();cx.moveTo(p.u,p.v);cx.lineTo(q.u,q.v);cx.stroke();cx.globalAlpha=1}
+  N.forEach((q,i)=>{cx.beginPath();cx.arc(q.u,q.v,(i===sel?10:8)*k,0,7);cx.fillStyle=i===sel?acc:pc;cx.fill();cx.strokeStyle='#fff';cx.lineWidth=2*k;cx.stroke();cx.font='bold '+(16*k)+'px sans-serif';cx.lineWidth=4*k;cx.strokeStyle='#fff';cx.strokeText(i+1,q.u+12*k,q.v-10*k);cx.fillStyle=i===sel?'#111':pc;cx.fillText(i+1,q.u+12*k,q.v-10*k)})}
+ if(tab==='photo'&&readCtl&&LAST){cx.strokeStyle=acc;cx.lineWidth=4*k;cx.setLineDash([14*k,8*k]);cx.strokeRect(LAST.x,LAST.y,LAST.w,LAST.h);cx.setLineDash([])}
+ if(tab==='check'&&located().length){const fsz=Math.max(14,22*k);paintItems(cx,u=>u,v=>v,fsz,true)}
+ if(tab!=='find')return;
+ const fs=$('#fst');
+ {const md=findMode();
+  if(md==='none'){fs.textContent='';return}
+  if(md==='notes'){fs.textContent=S.notes.length+(S.notes.length===1?' coordinate note':' coordinate notes')+' found on the iso. Letters mark where they are.';
+   S.notes.forEach((n,i)=>{if(n.u==null)return;const L=String.fromCharCode(65+i%26);cx.beginPath();cx.arc(n.u,n.v,16*k,0,7);cx.fillStyle=acc;cx.globalAlpha=.28;cx.fill();cx.globalAlpha=1;cx.strokeStyle=acc;cx.lineWidth=4*k;cx.stroke();cx.font='bold '+(20*k)+'px sans-serif';cx.lineWidth=5*k;cx.strokeStyle='#fff';cx.strokeText(L,n.u+20*k,n.v-14*k);cx.fillStyle='#111';cx.fillText(L,n.u+20*k,n.v-14*k)});
+   if(center){const q=S.notes.find(n=>n.u!=null);if(q)view.scrollTo({left:q.u*zoom-view.clientWidth/2,top:q.v*zoom-view.clientHeight/2,behavior:'smooth'})}
+   return}}
+ const pc2=pieces(curZone()),pad=S.pad;fs.textContent=pc2.length?pc2.length+(pc2.length===1?' pipe run':' pipe runs')+' in this area: '+pc2.map(p=>'#'+(p.i+1)).join(', '):'No pipe in this area.';
+ const path=new Path2D();pc2.forEach(p=>path.rect(Math.min(p.x0,p.x1)-pad,Math.min(p.y0,p.y1)-pad,Math.abs(p.x1-p.x0)+2*pad,Math.abs(p.y1-p.y0)+2*pad));
+ cx.fillStyle=acc;cx.globalAlpha=.3;cx.fill(path);cx.globalAlpha=1;cx.strokeStyle=acc;cx.lineWidth=2.5*k;cx.stroke(path);
+ cx.strokeStyle=acc;cx.lineWidth=7*k;cx.globalAlpha=.9;pc2.forEach(p=>{cx.beginPath();cx.moveTo(p.x0,p.y0);cx.lineTo(p.x1,p.y1);cx.stroke()});cx.globalAlpha=1;
+ pc2.forEach(p=>{const t='#'+(p.i+1),x=Math.min(p.x0,p.x1)-pad+5*k,y=Math.min(p.y0,p.y1)-pad+17*k;cx.font='bold '+(15*k)+'px sans-serif';cx.lineWidth=4*k;cx.strokeStyle='#fff';cx.strokeText(t,x,y);cx.fillStyle='#111';cx.fillText(t,x,y)});
+ if(center&&pc2.length){const p=pc2[0];view.scrollTo({left:(p.x0+p.x1)/2*zoom-view.clientWidth/2,top:(p.y0+p.y1)/2*zoom-view.clientHeight/2,behavior:'smooth'})}}
+
+load();$('#nsp').value=S.nsp;$('#esp').value=S.esp;$('#pad').value=S.pad;
+if(S.nodes.length)sel=S.nodes.length-1;
+fillNorth();renderNodes();update();initSample();
+if(window.__PRELOAD){const PL=window.__PRELOAD,pi=new Image();pi.onload=()=>{S.rot=0;img=pi;cv.width=pi.width;cv.height=pi.height;cv.style.display='block';$('#empty').hidden=true;$('#fc').hidden=false;fit();LAST={x:PL.crop.x*pi.width,y:PL.crop.y*pi.height,w:PL.crop.w*pi.width,h:PL.crop.h*pi.height};refreshAuto();const nn=PL.notes?importNotes(PL.notes,LAST):0;if(PL.list)importList(PL.list,false,LAST);const okr=PL.read?importRead(PL.read,LAST):null;if(!okr&&!nn){anote='Claude couldn\'t find any coordinates or a pipe to trace. Try a sharper photo, or trace by hand.';showNote()}else if(nn&&okr&&findMode()==='notes'){anote+=' The full route did not add up, so the answer uses the printed coordinates only.';showNote()}go(nn?'find':(listItems().length?'check':'trace'))};pi.src=PL.img}
+if(window.__STREAMLIT&&!window.__PRELOAD){const e=$('#empty');e.querySelector('b').textContent='Add your iso photo above';e.querySelector('p').textContent='Use the photo box at the top of the page, then tap Read the iso for me. Claude traces the pipe and brings you back here.';$('#pick').hidden=true}
+if(!S.seen)$('#helpbox').classList.add('open');
+</script>

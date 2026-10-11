@@ -1,0 +1,6 @@
+streamlit>=1.42
+anthropic>=0.40
+pillow>=10
+numpy>=1.24
+pillow-heif>=0.16
+requests>=2.31
