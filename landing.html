@@ -97,6 +97,16 @@ footer{padding:32px 0 48px;color:var(--mut);font-size:14px}
 
 <footer>© <span id="y"></span> Iso Finder. Not affiliated with any plant or employer. Verify all results against the issued drawing.</footer>
 </div>
-<script>document.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();try{window.parent.location.search="?app=1"}catch(x){window.top.location.search="?app=1"}}));document.getElementById('y').textContent=new Date().getFullYear()</script>
+<script>
+document.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",e=>{
+  e.preventDefault();
+  try{window.parent.scrollTo({top:0,behavior:"smooth"})}catch(x){}
+}));
+document.querySelectorAll('a[href="#how"]').forEach(a=>a.addEventListener("click",e=>{
+  e.preventDefault();
+  document.getElementById("how").scrollIntoView({behavior:"smooth"});
+}));
+document.getElementById('y').textContent=new Date().getFullYear();
+</script>
 </body>
 </html>

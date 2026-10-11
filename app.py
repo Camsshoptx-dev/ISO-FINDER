@@ -23,6 +23,9 @@ st.markdown(
 
 # Home page: shown until the visitor presses "Open the app" (adds ?app=1 to the address).
 if not st.query_params.get("app"):
+    if st.button("Open the app", type="primary", use_container_width=True):
+        st.query_params["app"] = "1"
+        st.rerun()
     components.html((Path(__file__).parent / "landing.html").read_text(encoding="utf-8"), height=900, scrolling=True)
     st.stop()
 
