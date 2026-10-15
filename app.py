@@ -8,6 +8,7 @@ import streamlit.components.v1 as components
 
 from iso_reader import build_doc, read_iso
 import store as S
+import billing as B
 
 st.set_page_config(page_title="Iso Finder", page_icon="🔧", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(
@@ -44,6 +45,11 @@ FREE_PER_MONTH = int(secret("FREE_READS_PER_MONTH", 10))  # per signed-in user (
 COOLDOWN_S = int(secret("COOLDOWN_SECONDS", 30))
 MODEL_QUICK = secret("MODEL_QUICK", "claude-sonnet-5-5")
 MODEL_DEEP = secret("MODEL_DEEP", "claude-opus-5-5")
+# USD per million tokens (input, output). Defaults are the list prices for these two models; change if you change models.
+PRICES = {
+    MODEL_QUICK: (float(secret("PRICE_QUICK_IN", 2)), float(secret("PRICE_QUICK_OUT", 10))),
+    MODEL_DEEP: (float(secret("PRICE_DEEP_IN", 4)), float(secret("PRICE_DEEP_OUT", 20))),
+}
 ACCESS_CODE = secret("ACCESS_CODE")  # only used when Google sign-in is not set up
 TESTER_CODES = {c.strip() for c in str(secret("ACCESS_CODES", "") or "").split(",") if c.strip()}
 if ACCESS_CODE:
@@ -51,6 +57,23 @@ if ACCESS_CODE:
 OWNER_CODE = str(secret("OWNER_CODE", "") or "").strip()  # your own code: big limit and the Admin page
 ADMINS = {e.strip().lower() for e in str(secret("ADMIN_EMAILS", "")).split(",") if e.strip()}
 AUTH_ON = bool(secret("auth")) if hasattr(st, "login") else False
+
+
+APP_URL = str(secret("APP_URL", "") or "").rstrip("/")
+STRIPE_KEY = secret("STRIPE_SECRET_KEY")
+PRICE_IDS = {"individual": secret("STRIPE_PRICE_INDIVIDUAL"), "team10": secret("STRIPE_PRICE_TEAM10"), "team20": secret("STRIPE_PRICE_TEAM20")}
+
+
+@st.cache_resource
+def billing():
+    if AUTH_ON and STRIPE_KEY and APP_URL:
+        return B.Billing(str(STRIPE_KEY), {k: v for k, v in PRICE_IDS.items() if v})
+    return None
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _entitlement(email):
+    return B.entitlement(store(), billing(), email, FREE_PER_MONTH)
 
 
 @st.cache_resource
@@ -71,8 +94,9 @@ def _client():
 def ask(prompt, jpegs, tier):
     import base64
 
+    model = MODEL_DEEP if tier == "deep" else MODEL_QUICK
     msg = _client().messages.create(
-        model=MODEL_DEEP if tier == "deep" else MODEL_QUICK,
+        model=model,
         max_tokens=8000,
         messages=[
             {
@@ -84,6 +108,15 @@ def ask(prompt, jpegs, tier):
             }
         ],
     )
+    try:  # remember what this call cost, for the Admin page
+        acc = st.session_state.setdefault("_acc", {"in": 0, "out": 0, "cost": 0.0})
+        pin, pout = PRICES.get(model, (0, 0))
+        ti, to = msg.usage.input_tokens, msg.usage.output_tokens
+        acc["in"] += ti
+        acc["out"] += to
+        acc["cost"] += ti / 1e6 * pin + to / 1e6 * pout
+    except Exception:
+        pass
     return "".join(b.text for b in msg.content if b.type == "text")
 
 
@@ -128,17 +161,69 @@ if user.get("blocked"):
 if IS_OWNER and user.get("monthly_limit") is None:
     store().set_user(email, monthly_limit=10000)
     user["monthly_limit"] = 10000
-limit = user.get("monthly_limit")
-limit = FREE_PER_MONTH if limit is None else int(limit)
-used = store().count_reads(S.month_start(), email)
+if st.query_params.get("paid"):
+    st.cache_data.clear()  # just came back from Stripe: look up the new plan
+    st.query_params.pop("paid", None)
+ent = _entitlement(email) if (AUTH_ON and billing()) else {"plan": "free", "limit": FREE_PER_MONTH, "group": None, "role": None, "seats": 0}
+if ent["plan"] != "free":
+    limit, group = ent["limit"], ent["group"]
+else:  # free: the admin override (or default) applies
+    limit = user.get("monthly_limit")
+    limit = FREE_PER_MONTH if limit is None else int(limit)
+    group = None
+used = store().count_reads(S.month_start(), emails=group) if group else store().count_reads(S.month_start(), email)
 
 bar = st.columns([5, 2, 1])
-bar[0].caption(("Signed in as " + email + " · " if AUTH_ON else ("Owner · " if IS_OWNER else "")) + "%d of %d reads left this month" % (max(0, limit - used), limit))
+bar[0].caption(("Signed in as " + email + " · " if AUTH_ON else ("Owner · " if IS_OWNER else "")) + ("%s plan · " % B.PLANS[ent["plan"]]["label"] if ent["plan"] != "free" else "") + "%d of %d reads left this month" % (max(0, limit - used), limit))
 IS_ADMIN = IS_OWNER or email in ADMINS
 if IS_ADMIN:
     bar[1].markdown("[Admin page](?app=1&admin=1)")
 if AUTH_ON:
     bar[2].button("Sign out", on_click=st.logout)
+
+# ---- plans and team ----
+if billing() and not st.query_params.get("admin"):
+    back = APP_URL + "/?app=1"
+    with st.expander("Plans, team and billing"):
+        if ent["plan"] == "free":
+            st.write("You are on the free plan. Pick a plan for more reads:")
+            for key, p in B.PLANS.items():
+                if PRICE_IDS.get(key):
+                    c1, c2 = st.columns([3, 2])
+                    c1.markdown("**%s** · %s · %d reads a month · %d %s" % (p["label"], p["price"], p["reads"], p["seats"], "person" if p["seats"] == 1 else "people"))
+                    if c2.button("Subscribe", key="sub_" + key):
+                        try:
+                            st.link_button("Continue to payment", billing().checkout_url(email, key, back))
+                        except Exception:
+                            st.error("Could not open the payment page. Try again in a minute.")
+        else:
+            st.write("Plan: **%s**." % B.PLANS[ent["plan"]]["label"])
+            if ent["role"] == "member":
+                st.caption("You are on the team of %s." % ent.get("boss", "your owner"))
+            if ent["role"] == "owner":
+                try:
+                    url = billing().portal_url(email, back)
+                    if url:
+                        st.link_button("Manage or cancel subscription", url)
+                except Exception:
+                    st.caption("Billing page is unavailable right now.")
+            if ent["role"] == "owner" and ent["seats"] > 1:
+                members = store().list_members(email)
+                st.markdown("**Team members** (%d of %d seats, besides you)" % (len(members), ent["seats"] - 1))
+                for m in members:
+                    c1, c2 = st.columns([4, 1])
+                    c1.write(m)
+                    if c2.button("Remove", key="rm_" + m):
+                        store().remove_member(email, m); st.cache_data.clear(); st.rerun()
+                if len(members) < ent["seats"] - 1:
+                    new = st.text_input("Add a teammate by Google email", key="newm").strip().lower()
+                    if st.button("Add teammate") and "@" in new and new != email:
+                        if store().owner_of(new):
+                            st.error("That person is already on a team.")
+                        else:
+                            store().add_member(email, new); st.cache_data.clear(); st.rerun()
+        if st.button("Refresh my plan"):
+            st.cache_data.clear(); st.rerun()
 
 # ---- admin page ----
 if IS_ADMIN and st.query_params.get("admin"):
@@ -146,7 +231,13 @@ if IS_ADMIN and st.query_params.get("admin"):
     users = store().list_users()
     st.metric("Reads today (all users)", store().count_reads(S.day_start()))
     st.metric("Reads this month (all users)", store().count_reads(S.month_start()))
-    rows = [{"email": u["email"], "plan": u.get("plan"), "limit": u.get("monthly_limit") or FREE_PER_MONTH, "blocked": u.get("blocked"), "reads this month": store().count_reads(S.month_start(), u["email"])} for u in users]
+    cm, cd = store().sum_cost(S.month_start()), store().sum_cost(S.day_start())
+    n_cost = store().count_costed(S.month_start())
+    st.metric("Estimated Claude cost today", "$%.2f" % cd)
+    st.metric("Estimated Claude cost this month", "$%.2f" % cm)
+    st.metric("Average cost per read", ("$%.3f" % (cm / n_cost)) if n_cost else "no data yet")
+    st.caption("Worked out from the tokens each read used and the list prices. Reads made before this was added are not included. Compare with the Console's Usage page.")
+    rows = [{"email": u["email"], "plan": u.get("plan"), "limit": u.get("monthly_limit") or FREE_PER_MONTH, "blocked": u.get("blocked"), "reads this month": store().count_reads(S.month_start(), u["email"]), "cost this month": "$%.2f" % store().sum_cost(S.month_start(), u["email"])} for u in users]
     st.dataframe(rows, use_container_width=True)
     who = st.selectbox("Pick a user", [u["email"] for u in users] or [""])
     c1, c2, c3 = st.columns(3)
@@ -171,17 +262,22 @@ with st.expander("1. Add your iso photo" if st.session_state.result is None else
     )
     can = True
     if up and can and st.button("Read the iso for me", type="primary", use_container_width=True):
-        ok, msg, _ = S.check_allowed(store(), email, default_monthly=FREE_PER_MONTH, app_daily=MAX_PER_DAY, cooldown_s=COOLDOWN_S)
+        ok, msg, _ = S.check_allowed(store(), email, default_monthly=FREE_PER_MONTH, app_daily=MAX_PER_DAY, cooldown_s=COOLDOWN_S, limit=limit if ent["plan"] != "free" else None, group=group)
         if up.size > 15 * 1024 * 1024:
             st.error("That photo is over 15 MB. Take it again at a lower resolution.")
         elif not ok:
             st.error(msg)
         else:
+            st.session_state["_acc"] = {"in": 0, "out": 0, "cost": 0.0}
             rid = store().add_read(email)
             try:
                 with st.spinner("Claude is reading the iso and zooming in on the small print. This takes about a minute."):
                     st.session_state.result = read_iso(up.getvalue(), ask, [f.getvalue() for f in (up2 or [])][:3])
-                store().finish_read(rid, "ok")
+                acc = st.session_state.get("_acc") or {}
+                try:
+                    store().finish_read(rid, "ok", acc.get("in"), acc.get("out"), acc.get("cost"))
+                except Exception:
+                    pass
                 st.rerun()
             except Exception as e:  # show a short reason, never the key
                 store().finish_read(rid, "failed")
