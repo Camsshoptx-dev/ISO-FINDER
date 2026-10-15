@@ -103,7 +103,7 @@ def p5(n, focused):
             SHAPE,
             "- line: the line or drawing number from the title block, or null.",
             "- kind: one of " + KINDLIST + ".",
-            "- ref: the item number, tag, weld number or piece number as printed. desc: the description as printed, shortened to 80 characters. size and qty: as printed (qty for pipe is a length), or null.",
+            "- ref: the item number, tag, weld number or piece number as printed. desc: the description as printed, shortened to 80 characters. size and qty: as printed (qty for pipe is a length), or null. For bolts, studs and nuts, size is the bolt diameter in inches from the SIZE column (for example 1/2 or 5/8), not the length.",
             WHAT,
             "Text can be small or slanted: read each row at its angle, one cell at a time. If a cell is unclear use null for that cell. If a table is unreadable, skip it. Never guess.",
         ]

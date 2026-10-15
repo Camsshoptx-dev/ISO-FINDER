@@ -416,7 +416,7 @@ const P5=(n,focused)=>[
  'Reply with only JSON in this shape:',SHAPE,
  '- line: the line or drawing number from the title block, or null.',
  '- kind: one of '+KINDLIST+'.',
- '- ref: the item number, tag, weld number or piece number as printed. desc: the description as printed, shortened to 80 characters. size and qty: as printed (qty for pipe is a length), or null.',WHAT,
+ '- ref: the item number, tag, weld number or piece number as printed. desc: the description as printed, shortened to 80 characters. size and qty: as printed (qty for pipe is a length), or null. For bolts, studs and nuts, size is the bolt diameter in inches from the SIZE column (for example 1/2 or 5/8), not the length.',WHAT,
  'Text can be small or slanted: read each row at its angle, one cell at a time. If a cell is unclear use null for that cell. If a table is unreadable, skip it. Never guess.'].join('\n');
 const P7=(set,ctx)=>{const t=set&&set.cols?set.cols*set.rows:0;return[
  t?'These '+(t+1)+' images show the isometric pipe drawing from a plant piping iso, already upright. Image 1 is the whole drawing. Images 2 to '+(t+1)+' are zoomed-in tiles of it, '+set.cols+' across and '+set.rows+' down, in reading order, overlapping by about 12%. Use the tiles to read small print.':'This image is a close-up of the isometric pipe drawing from a plant piping iso, already upright.',
@@ -765,13 +765,14 @@ function toInch(s){s=String(s).trim().replace(/"/g,'');let m;
  if(m=s.match(/^(\d+)\/(\d+)$/))return m[1]/m[2];
  if(m=s.match(/^\d*\.\d+$|^\d+$/))return +s;return null}
 function boltDia(x){const t=[x.desc,x.what].filter(Boolean).join(' ').toUpperCase().replace(/×/g,'X'),sz=String(x.size||'').toUpperCase();
- const m=t.match(/^(.*?)\s*X\s*\d/);let left=m?m[1]:'';
- left=left.replace(/(\d\/\d)-\d+(\s*(UNC|UN\w*|TPI))?\s*$/,'$1').replace(/[\s"'-]+\d+\s*(UNC|UNF|UN\w*|TPI)\b\s*$/,'').replace(/(\d)\s*(IN|INCH)\b\s*$/,'$1').replace(/"\s*$/,'').trim();
- let d=left.match(/(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+|\d+)$/);let v=d?toInch(d[1]):null;
- if(v==null||v>3||v<.25){v=null;const s2=sz.match(/^(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+)\s*"?$/);if(s2)v=toInch(s2[1])}
+ const FR=/(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+|\d+)$/;let v=null;
+ const m=t.match(/^(.*?)(?:^|[\s\d"'])X\s*\d/);
+ if(m&&m[1]!=null){let left=m[1].replace(/(\d\/\d)-\d+(\s*(UNC|UN\w*|TPI))?\s*$/,'$1').replace(/[\s"'-]+\d+\s*(UNC|UNF|UN\w*|TPI)\b\s*$/,'').replace(/(\d)\s*(IN|INCH)\b\s*$/,'$1').replace(/"\s*$/,'').trim();
+  const d=left.match(FR);if(d)v=toInch(d[1])}
+ if(v==null||v>3||v<.25){v=null;const s2=sz.match(/^(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+)\s*(")?$/);if(s2)v=toInch(s2[1])}
  return v&&v>=.25&&v<=3?v:null}
 function wrench(x){if(!x||x.kind!=='bolt')return null;const v=boltDia(x);if(v==null)return null;const key=Math.round(v*10000)/10000,t=String([x.desc,x.what].join(' ')).toUpperCase();
- const reg=/(HEX (HEAD )?(CAP )?(BOLT|SCREW)|MACHINE BOLT|CAP SCREW|A307|A325)/.test(t)&&!/(STUD|HEAVY|NUT)/.test(t);
+ const reg=/(HEX (HEAD )?(CAP )?(BOLT|SCREW)|MACHINE BOLT|CAP SCREW|A307|A325)/.test(t)&&!/(STUD|HEAVY|HVY|NUT)/.test(t);
  const tbl=reg?WR_REG:WR_HEAVY,w=tbl[key];if(!w)return null;
  const dia=Object.keys(WR_HEAVY).map(Number).find(k=>Math.abs(k-key)<1e-4);return{size:w+'"',kind:reg?'regular hex':'heavy hex nut',dia:v}}
 function wrenchLine(x){const w=wrench(x);return w?'Wrench: '+w.size+'  ('+w.kind+')':''}
