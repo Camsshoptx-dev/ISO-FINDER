@@ -200,6 +200,7 @@ summary{font-weight:600}
 #where .me .tile:first-child{background:var(--bg);border-color:var(--ln)}#where .me .tile:first-child .tk,#where .me .tile:first-child .ts{color:var(--mut);opacity:1}#where .me .tile:first-child .tv{color:var(--ink)}
 .me .tile.in{background:transparent;border-style:dashed}
 .me .ends{font-family:var(--mono);font-size:12px;color:var(--mut);margin:8px 0 4px;padding:0;list-style:none}.me .ends li{padding:4px 0;border-top:1px solid var(--ln2)}
+.wr{color:var(--acc);font-weight:700}
 </style>
 <header id="top">
   <div class="steps" role="tablist" aria-label="Steps">
@@ -756,6 +757,25 @@ async function readListOnly(){if(!sampleFn||!img||readCtl)return;readCtl=new Abo
  finally{readCtl=null;$('#cbusy').hidden=true;refreshAuto();update()}}
 $('#cstop').onclick=()=>{if(readCtl)readCtl.abort()};
 function remainingText(){const L=listItems().filter(x=>!x.done);return (S.list&&S.list.line?S.list.line+'\n':'')+'Still to check ('+L.length+'):\n'+L.map(x=>'- '+[x.ref,x.desc,x.size,x.qty].filter(Boolean).join('  ')).join('\n')}
+/* wrench size for bolts: standard across-flats sizes of heavy hex nuts (flange studs) and regular hex nuts/heads, in inches */
+const WR_HEAVY={0.25:'1/2',0.3125:'9/16',0.375:'11/16',0.4375:'3/4',0.5:'7/8',0.5625:'15/16',0.625:'1-1/16',0.75:'1-1/4',0.875:'1-7/16',1:'1-5/8',1.125:'1-13/16',1.25:'2',1.375:'2-3/16',1.5:'2-3/8',1.625:'2-9/16',1.75:'2-3/4',1.875:'2-15/16',2:'3-1/8',2.25:'3-1/2',2.5:'3-7/8',2.75:'4-1/4',3:'4-5/8'};
+const WR_REG={0.25:'7/16',0.3125:'1/2',0.375:'9/16',0.4375:'11/16',0.5:'3/4',0.5625:'7/8',0.625:'15/16',0.75:'1-1/8',0.875:'1-5/16',1:'1-1/2',1.125:'1-11/16',1.25:'1-7/8',1.375:'2-1/16',1.5:'2-1/4'};
+function toInch(s){s=String(s).trim().replace(/"/g,'');let m;
+ if(m=s.match(/^(\d+)[- ](\d+)\/(\d+)$/))return +m[1]+m[2]/m[3];
+ if(m=s.match(/^(\d+)\/(\d+)$/))return m[1]/m[2];
+ if(m=s.match(/^\d*\.\d+$|^\d+$/))return +s;return null}
+function boltDia(x){const t=[x.desc,x.what].filter(Boolean).join(' ').toUpperCase().replace(/×/g,'X'),sz=String(x.size||'').toUpperCase();
+ const m=t.match(/^(.*?)\s*X\s*\d/);let left=m?m[1]:'';
+ left=left.replace(/(\d\/\d)-\d+(\s*(UNC|UN\w*|TPI))?\s*$/,'$1').replace(/[\s"'-]+\d+\s*(UNC|UNF|UN\w*|TPI)\b\s*$/,'').replace(/(\d)\s*(IN|INCH)\b\s*$/,'$1').replace(/"\s*$/,'').trim();
+ let d=left.match(/(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+|\d+)$/);let v=d?toInch(d[1]):null;
+ if(v==null||v>3||v<.25){v=null;const s2=sz.match(/^(\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+)\s*"?$/);if(s2)v=toInch(s2[1])}
+ return v&&v>=.25&&v<=3?v:null}
+function wrench(x){if(!x||x.kind!=='bolt')return null;const v=boltDia(x);if(v==null)return null;const key=Math.round(v*10000)/10000,t=String([x.desc,x.what].join(' ')).toUpperCase();
+ const reg=/(HEX (HEAD )?(CAP )?(BOLT|SCREW)|MACHINE BOLT|CAP SCREW|A307|A325)/.test(t)&&!/(STUD|HEAVY|NUT)/.test(t);
+ const tbl=reg?WR_REG:WR_HEAVY,w=tbl[key];if(!w)return null;
+ const dia=Object.keys(WR_HEAVY).map(Number).find(k=>Math.abs(k-key)<1e-4);return{size:w+'"',kind:reg?'regular hex':'heavy hex nut',dia:v}}
+function wrenchLine(x){const w=wrench(x);return w?'Wrench: '+w.size+'  ('+w.kind+')':''}
+function wrenchSummary(g){const seen={};g.forEach(x=>{const w=wrench(x);if(w)seen[w.size]=1});const k=Object.keys(seen);return k.length?'Wrenches you will need: '+k.join(', ')+'. Studs have a nut on each end, so bring two of the same size.':''}
 function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('#dock').scrollTop;c.innerHTML='';const L=listItems(),done=L.filter(x=>x.done).length;
  if(!L.length){const w=el('div','wt');w.append(el('p',null,readCtl?'Reading the lists on the sheet…':'No list yet. Claude reads the material list, cut pipe lengths, welds and supports from the sheet so you can check them off while you walk the line.'));
   if(sampleFn&&img&&!readCtl){const b=el('button','pri','Read the lists from this photo');b.onclick=readListOnly;w.append(b)}
@@ -771,11 +791,11 @@ function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('
   tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);
   KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;const gd=g.filter(x=>x.done).length;
    const vis=S.hideDone?g.filter(x=>!x.done):g;if(!vis.length)return;
-   const d=el('details');d.open=true;const sm=el('summary');sm.append(document.createTextNode(name));sm.append(el('span','n',gd+'/'+g.length));d.append(sm);if(hint)d.append(el('p','gh',hint));
+   const d=el('details');d.open=true;const sm=el('summary');sm.append(document.createTextNode(name));sm.append(el('span','n',gd+'/'+g.length));d.append(sm);if(hint)d.append(el('p','gh',hint));if(k==='bolt'){const ws=wrenchSummary(g);if(ws)d.append(el('p','gh wr',ws))}
    vis.forEach(x=>{const row=el('label','ci'+(x.done?' done':''));const cbx=document.createElement('input');cbx.type='checkbox';cbx.checked=x.done;cbx.setAttribute('aria-label',[x.ref,x.desc].filter(Boolean).join(' '));
     cbx.onchange=()=>{x.done=cbx.checked;row.classList.toggle('done',x.done);save();const n=L.filter(y=>y.done).length;hd.firstChild.textContent=n+' of '+L.length+' checked';bar.style.width=Math.round(n/L.length*100)+'%';sm.querySelector('.n').textContent=g.filter(y=>y.done).length+'/'+g.length;update2();if(S.hideDone)setTimeout(renderCheck,350)};
     const t=el('div');const ct=el('div','ct');if(x.ref)ct.append(el('b',null,x.ref));ct.append(document.createTextNode(x.what||x.desc||''));t.append(ct);
-    const meta=[x.what&&x.desc&&x.desc!==x.what?x.desc:'',x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('  ·  ');if(meta)t.append(el('div','cm',meta));
+    const meta=[x.what&&x.desc&&x.desc!==x.what?x.desc:'',x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('  ·  ');if(meta)t.append(el('div','cm',meta));const wl=wrenchLine(x);if(wl)t.append(el('div','cm wr',wl));
     row.append(cbx,t);d.append(row)});
    c.append(d)})}
  const f=el('form','addrow');const inp=document.createElement('input');inp.placeholder='Add something that is missing';inp.setAttribute('aria-label','Add an item');const ab=el('button',null,'Add');ab.type='submit';f.append(inp,ab);
@@ -866,8 +886,8 @@ async function makePdf(){
   P.text('Check list',M,y+8,16,'B',INK);P.text(done+' of '+L.length+' checked',W-M-P.width(done+' of '+L.length+' checked',9,'R'),y+7,9,'R',MUT);y+=24;
   KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;need(60);
    P.rect(M,y,CW,19,{fill:'#e6ecf1'});P.text(name,M+8,y+13,10.5,'B',INK);const cnt=g.filter(x=>x.done).length+'/'+g.length;P.text(cnt,W-M-8-P.width(cnt,8,'R'),y+13,8,'R',MUT);y+=30;
-   if(hint){P.wrap(hint,CW,8,'R').forEach(l=>{P.text(l,M+2,y,8,'R',MUT);y+=10});y+=8}
-   g.forEach(x=>{const main=P.wrap(x.what||x.desc||'',330,9.5,'B'),sub=x.what&&x.desc&&x.desc!==x.what?P.wrap(x.desc,330,8,'R').slice(0,2):[],meta=P.wrap([x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('   '),104,8.5,'R'),
+   if(hint){P.wrap(hint+(k==='bolt'&&wrenchSummary(g)?'  '+wrenchSummary(g):''),CW,8,'R').forEach(l=>{P.text(l,M+2,y,8,'R',MUT);y+=10});y+=8}
+   g.forEach(x=>{const main=P.wrap(x.what||x.desc||'',330,9.5,'B'),sub=(x.what&&x.desc&&x.desc!==x.what?P.wrap(x.desc,330,8,'R').slice(0,2):[]).concat(wrenchLine(x)?[wrenchLine(x)]:[]),meta=P.wrap([x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('   '),104,8.5,'R'),
      rows=Math.max(main.length*12+sub.length*10,meta.length*11)+8;need(rows+2);
      P.rect(M+2,y-9,11,11,{stroke:INK,lw:1});if(x.done){P.line(M+4,y-3,M+7,y,INK,1.4);P.line(M+7,y,M+12,y-8,INK,1.4)}
      if(x.ref)P.text(String(x.ref).slice(0,9),M+20,y,8,'M',MUT);
