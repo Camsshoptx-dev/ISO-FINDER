@@ -257,17 +257,47 @@ if IS_ADMIN and st.query_params.get("admin"):
     st.markdown("[Back to the app](?app=1)")
     st.stop()
 
-with st.expander("1. Add your iso photo" if st.session_state.result is None else "Photo added. Open to read a different iso", expanded=st.session_state.result is None):
-    st.caption("Lay the iso flat, shoot straight down, and fill the frame with the pipe drawing. Bright, even light helps Claude read the small numbers.")
+st.markdown(
+    """
+    <style>
+      .stApp{background:radial-gradient(900px 520px at 88% -8%,rgba(255,130,64,.20),transparent 60%),#0a1319;}
+      .iso-hero{padding:6px 2px 4px}
+      .iso-kick{display:inline-block;font-weight:800;letter-spacing:.16em;font-size:.72rem;color:#1d0d02;background:#ff8240;padding:4px 12px;border-radius:999px}
+      .iso-hero h2{font-size:clamp(2rem,7vw,3rem);font-weight:800;letter-spacing:-.02em;line-height:1;margin:12px 0 8px;padding:0;color:#e9f0f4}
+      .iso-hero p{color:#9fb2be;margin:0 0 12px;font-size:1.02rem}
+      .iso-tips span{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border-radius:999px;border:1px solid #243843;background:#0f1920;color:#b9c9d3;font-size:.82rem}
+      [data-testid="stFileUploaderDropzone"]{border:2px dashed #ff8240;border-radius:22px;background:rgba(255,130,64,.06);padding:30px 16px;transition:background .25s,box-shadow .25s}
+      [data-testid="stFileUploaderDropzone"]:hover{background:rgba(255,130,64,.13);box-shadow:0 0 44px rgba(255,130,64,.28)}
+      [data-testid="stFileUploaderDropzoneInstructions"] > div > span{display:none}
+      [data-testid="stFileUploaderDropzoneInstructions"] > div::before{content:"Tap to take or choose a photo";font-weight:800;font-size:1.15rem;color:#e9f0f4}
+      [data-testid="stFileUploaderDropzoneInstructions"] small{display:none}
+      [data-testid="stFileUploaderDropzone"] button{border:2px solid #ff8240;color:#ff8240;border-radius:14px;font-weight:800;background:transparent}
+      .stButton > button[kind="primary"],[data-testid="stBaseButton-primary"]{background:linear-gradient(135deg,#ff8a4c,#ff6a13)!important;color:#1d0d02!important;border:0!important;border-radius:18px!important;min-height:3.7rem;font-weight:800;font-size:1.15rem;letter-spacing:.01em;box-shadow:0 12px 36px rgba(255,130,64,.4);transition:transform .15s,box-shadow .15s}
+      .stButton > button[kind="primary"]:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(255,130,64,.55)}
+      [data-testid="stExpander"]{border:1px solid #243843;border-radius:18px;background:#0f1920}
+      [data-testid="stFileUploaderFile"]{border-radius:12px}
+      .iso-note{color:#7f93a0;font-size:.85rem;text-align:center;margin-top:6px}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+_first = st.session_state.result is None
+_box = st.container() if _first else st.expander("Read a different iso", expanded=False)
+with _box:
+    if _first:
+        st.markdown(
+            '<div class="iso-hero"><span class="iso-kick">STEP 1</span><h2>Start with your iso</h2>'
+            "<p>One clear photo of the drawing. It reads the coordinates and builds your checklist.</p>"
+            '<div class="iso-tips"><span>Lay it flat</span><span>Shoot straight down</span><span>Fill the frame</span><span>Even light</span><span>Sharp small print</span></div></div>',
+            unsafe_allow_html=True,
+        )
     up = st.file_uploader("Photo of the iso", type=["jpg", "jpeg", "png", "webp", "heic", "heif"], label_visibility="collapsed")
-    up2 = st.file_uploader(
-        "Optional: photo of the material list (bill of material)",
-        type=["jpg", "jpeg", "png", "webp", "heic", "heif"],
-        accept_multiple_files=True,
-        help="Use this when the material list is on another part of the sheet or did not fit in the first photo. It is how the circled numbers get their names.",
-    )
+    up2 = []
+    if st.checkbox("Add a photo of the material list too", help="Use this when the material list is on another part of the sheet or did not fit in the first photo. It is how the circled numbers get their names."):
+        up2 = st.file_uploader("Photo of the material list", type=["jpg", "jpeg", "png", "webp", "heic", "heif"], accept_multiple_files=True, label_visibility="collapsed")
     can = True
-    if up and can and st.button("Read the iso for me", type="primary", use_container_width=True):
+    if up and can and st.button("Read the iso", type="primary", use_container_width=True):
         ok, msg, _ = S.check_allowed(store(), email, default_monthly=FREE_PER_MONTH, app_daily=MAX_PER_DAY, cooldown_s=COOLDOWN_S, limit=limit if ent["plan"] != "free" else None, group=group)
         if up.size > 15 * 1024 * 1024:
             st.error("That photo is over 15 MB. Take it again at a lower resolution.")
