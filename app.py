@@ -27,9 +27,15 @@ if not st.query_params.get("app"):
     def _go():
         st.query_params["app"] = "1"
 
+    st.markdown(
+        """<style>
+        .st-key-go_top{position:fixed;bottom:18px;left:16px;right:16px;z-index:9999}
+        .st-key-go_top button{height:64px;font-size:1.25rem;font-weight:800;letter-spacing:.02em;box-shadow:0 10px 40px rgba(255,130,64,.55),0 0 0 6px rgba(10,19,25,.6)}
+        </style>""",
+        unsafe_allow_html=True,
+    )
     st.button("Open Iso Finder", type="primary", use_container_width=True, on_click=_go, key="go_top")
-    components.html((Path(__file__).parent / "landing.html").read_text(encoding="utf-8"), height=1500, scrolling=True)
-    st.button("Open Iso Finder", type="primary", use_container_width=True, on_click=_go, key="go_bottom")
+    components.html((Path(__file__).parent / "landing.html").read_text(encoding="utf-8"), height=900, scrolling=True)
     st.stop()
 
 
