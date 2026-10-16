@@ -202,6 +202,7 @@ summary{font-weight:600}
 .me .ends{font-family:var(--mono);font-size:12px;color:var(--mut);margin:8px 0 4px;padding:0;list-style:none}.me .ends li{padding:4px 0;border-top:1px solid var(--ln2)}
 .wr{color:var(--acc);font-weight:700}
 .bu{background:var(--pn);border:1px solid var(--ln);border-radius:18px;padding:16px;margin:10px 0}
+.jt{border:1px solid var(--ln);border-radius:14px;padding:12px;margin:10px 0}.jt-h{font:800 22px "Barlow Semi Condensed",var(--disp),sans-serif;color:var(--acc);margin-bottom:6px}.jt-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.jt-f{display:flex;flex-direction:column;font-size:12px;gap:3px}.jt-f input,.jt-f select{font-size:16px;padding:8px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:inherit;width:100%;box-sizing:border-box}.jt-t{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}.jt-t div{background:var(--bg);border-radius:10px;padding:8px;text-align:center}.jt-t i{display:block;font-style:normal;font-size:12px;opacity:.7}.jt-t b{font-size:17px}
 .bu-t{font:800 24px "Barlow Semi Condensed",var(--disp),sans-serif;text-transform:uppercase;margin-bottom:8px}
 .bu-warn{background:rgba(255,130,64,.12);border:1px solid var(--acc);border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
 .bu-r{display:block;margin:10px 0}.bu-r span{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
@@ -852,7 +853,7 @@ function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('
   const hb=el('button',S.hideDone?'on':'',S.hideDone?'Show checked':'Hide checked');hb.onclick=()=>{S.hideDone=!S.hideDone;save();renderCheck()};
   const cb=el('button',null,'Copy what is left');cb.onclick=async()=>{const t=remainingText();let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){try{const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.append(a);a.select();ok=document.execCommand('copy');a.remove()}catch(e2){}}cb.textContent=ok?'Copied':'Could not copy';setTimeout(()=>cb.textContent='Copy what is left',1800)};
   const rb=el('button',null,'Clear checks');rb.onclick=()=>{if(rb.dataset.arm){L.forEach(x=>x.done=false);save();renderCheck()}else{rb.dataset.arm=1;rb.textContent='Tap again to clear';setTimeout(()=>{rb.dataset.arm='';rb.textContent='Clear checks'},2500)}};
-  tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);const bb=el('button','ghost','Bolt-up guide: torque and pattern');bb.style.marginTop='8px';const bh=el('div');bb.onclick=()=>{BU_OPEN=!BU_OPEN;bh.innerHTML='';if(BU_OPEN)renderBolt(bh)};c.append(bb,bh);if(BU_OPEN)renderBolt(bh);
+  tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);const bb=el('button','ghost','Bolt-up guide: torque and pattern');bb.style.marginTop='8px';const bh=el('div');bb.onclick=()=>{BU_OPEN=!BU_OPEN;bh.innerHTML='';if(BU_OPEN)renderBolt(bh)};c.append(bb,bh);if(BU_OPEN)renderBolt(bh);const jb=el('button','ghost','Joint torque table (30 / 70 / 100%)');jb.style.marginTop='8px';const jh=el('div');jb.onclick=()=>{JT_OPEN=!JT_OPEN;jh.innerHTML='';if(JT_OPEN)renderJoints(jh)};c.append(jb,jh);if(JT_OPEN)renderJoints(jh);
   KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;const gd=g.filter(x=>x.done).length;
    const vis=S.hideDone?g.filter(x=>!x.done):g;if(!vis.length)return;
    const d=el('details');d.open=true;const sm=el('summary');sm.append(document.createTextNode(name));sm.append(el('span','n',gd+'/'+g.length));d.append(sm);if(hint)d.append(el('p','gh',hint));if(k==='bolt'){const ws=wrenchSummary(g);if(ws)d.append(el('p','gh wr',ws))}
@@ -918,6 +919,28 @@ async function pageJpeg(mode){ // the drawing with the note markers (and the tra
   x.beginPath();x.arc(px,py,fs*.85,0,7);x.fillStyle='rgba(242,106,27,.28)';x.fill();x.lineWidth=Math.max(3,fs/6);x.strokeStyle=acc;x.stroke();
   x.font='bold '+fs+'px sans-serif';x.lineWidth=fs/4;x.strokeStyle='#fff';x.strokeText(L,px+fs,py-fs*.5);x.fillStyle='#111';x.fillText(L,px+fs,py-fs*.5)});
  const blob=await new Promise(ok=>c.toBlob(ok,'image/jpeg',.88));return{bytes:new Uint8Array(await blob.arrayBuffer()),w:W,h:H}}
+/* ---------- joint torque table: one row per joint tag ---------- */
+let JT_OPEN=false;
+function sizeOf(t){const m=String(t||'').match(/(\d+(?:[- ]\d\/\d)|\d+\.\d+|\d+\/\d+|\d+)\s*(?:"|''|in\b|inch)/i);return m?m[1].replace(' ','-')+'"':''}
+function classOf(t){const m=String(t||'').match(/\bCL(?:ASS)?\.?\s*(\d{3,4})|\b(\d{3,4})\s*(?:#|LBS?\b)/i);return m?m[1]||m[2]:''}
+function jointRows(){const L=listItems(),st=buDefaults(),fl=L.filter(x=>x.kind==='flange'),tags=L.filter(x=>x.kind==='tag'),base=tags.length?tags:fl;
+ const fsz=fl.map(x=>x.size&&sizeOf(x.size+'"')||sizeOf(x.desc)||sizeOf(x.what)).find(Boolean)||'',fcl=fl.map(x=>classOf(x.desc)||classOf(x.what)).find(Boolean)||'';
+ const lab=d=>(BU_DIA.find(q=>q[0]===d)||[0,''])[1];S.joints=S.joints||{};
+ return base.map((x,i)=>{const no=String(x.ref||('J'+(i+1))),o=S.joints[no]||{},size=o.size!=null?o.size:(sizeOf(x.size?x.size+'"':'')||sizeOf(x.desc)||fsz),cls=o.cls!=null?o.cls:(classOf(x.desc)||fcl),dia=o.dia||st.dia,n=o.n||st.n,site=parseFloat(st.site),full=site>0?site:boltTorque(dia,st.k,st.ksi).T,w=wrench({kind:'bolt',desc:'STUD NUT',size:lab(dia)});
+  return{no,size,cls,dia,diaLab:lab(dia),n,wr:w?w.size:'',T:[.3,.7,1].map(f=>full*f),desc:x.desc||''}})}
+function renderJoints(host){host.innerHTML='';const rows=jointRows(),line=(S.list&&S.list.line)||'';
+ const box=el('div','bu');box.append(el('div','bu-t','Joint torque table'));
+ box.append(el('div','bu-sub','Iso: '+(line||'(no number read)')+'. One row per joint tag. Fix the size, class and bolts if the photo read them wrong, then save the PDF: the table prints on its own page. Torque uses the lube and stress set in the bolt-up guide.'));
+ if(!rows.length){box.append(el('div','bu-warn','No joint tags or flanges on the list yet. Read the iso first, or add a J tag to the list.'));host.append(box);return}
+ rows.forEach(r=>{const c=el('div','jt');c.append(el('div','jt-h',r.no));
+  const f=(lab,v,fn,ph)=>{const l=el('label','jt-f');l.append(el('span',null,lab));const i=document.createElement('input');i.value=v;i.placeholder=ph||'';i.onchange=()=>{fn(i.value.trim());save();renderJoints(host)};l.append(i);return l};
+  const set=(k,v)=>{S.joints[r.no]=Object.assign(S.joints[r.no]||{},{[k]:v})};
+  const sd=document.createElement('select');BU_DIA.forEach(d=>{const o=document.createElement('option');o.value=d[0];o.textContent=d[1];if(d[0]===r.dia)o.selected=true;sd.append(o)});sd.onchange=()=>{set('dia',+sd.value);save();renderJoints(host)};const ld=el('label','jt-f');ld.append(el('span',null,'Bolt'),sd);
+  const sn=document.createElement('select');Object.keys(BU_PAT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k+' bolts';if(+k===r.n)o.selected=true;sn.append(o)});sn.onchange=()=>{set('n',+sn.value);save();renderJoints(host)};const ln=el('label','jt-f');ln.append(el('span',null,'Count'),sn);
+  const g=el('div','jt-g');g.append(f('Size',r.size,v=>set('size',v),'2"'),f('Class',r.cls,v=>set('cls',v),'150'),ld,ln);c.append(g);
+  const t=el('div','jt-t');['30%','70%','100%'].forEach((p,i)=>{const d=el('div');d.append(el('i',null,p),el('b',null,fmtT(r.T[i])+' ft-lb'));t.append(d)});c.append(t);
+  if(r.wr)c.append(el('div','bu-sub wr','Wrench: '+r.wr));box.append(c)});
+ host.append(box)}
 async function makePdf(){
  const P=new MiniPDF(),W=P.W,H=P.H,M=40,CW=W-2*M,INK='#0b1a25',MUT='#566774',LN='#d3dce4',ACC='#f26a1b';let y=0;
  const line=(S.list&&S.list.line)||'',wh=window.__WH,L=listItems();
@@ -963,6 +986,21 @@ async function makePdf(){
      meta.forEach((l,j)=>P.text(l,W-M-104,y+j*11,8.5,'R',INK));
      y+=rows;});
    y+=8})}
+ {const J=jointRows();if(J.length)try{
+  P.newPage();y=M;P.text('JOINT TORQUE TABLE',M,y+8,16,'B',INK);P.rect(M,y+13,36,3,{fill:ACC});y+=28;
+  P.rect(M,y,CW,44,{fill:INK});P.rect(M,y,6,44,{fill:ACC});P.text('ISO NUMBER',M+16,y+16,8,'B',ACC);P.text(line||'(not read)',M+16,y+36,line.length>26?15:20,'B','#ffffff');
+  const st=buDefaults(),k2=(BU_K.find(q=>q[1]===st.k)||[''])[0],site=parseFloat(st.site);
+  P.wrap((site>0?'Full torque from site spec. ':'Calculated, '+st.ksi+' ksi. ')+k2,190,8,'R').slice(0,3).forEach((l,j)=>P.text(l,W-M-200,y+14+j*10,8,'R','#c7d5de'));y+=58;
+  const cx=[M,M+52,M+98,M+156,M+222,M+290,M+362,M+434,M+500],hd=['JOINT','SIZE','CLASS','BOLTS','WRENCH','30%','70%','100%','OK'],drawH=()=>{P.rect(M,y,CW,20,{fill:INK});hd.forEach((h,i)=>P.text(h,cx[i]+4,y+14,8,'B',i>=5&&i<8?ACC:'#ffffff'));y+=20};
+  drawH();
+  J.forEach((r,i)=>{if(y+30>H-46){P.newPage();y=M+8;drawH()}
+   P.rect(M,y,CW,28,{fill:i%2?'#ffffff':'#f6f8fa',stroke:LN,lw:.5});
+   P.text(String(r.no).slice(0,8),cx[0]+4,y+18,11,'B',ACC);P.text(r.size||'____',cx[1]+4,y+18,10,'B',INK);P.text(r.cls?'Cl '+r.cls:'____',cx[2]+4,y+18,9.5,'B',INK);
+   P.text(r.n+' x '+r.diaLab,cx[3]+4,y+18,9,'R',INK);P.text(r.wr||'-',cx[4]+4,y+18,8.5,'R',INK);
+   r.T.forEach((t,j)=>P.text(fmtT(t),cx[5+j]+4,y+19,j===2?12:10.5,'B',INK));P.rect(cx[8]+6,y+8,13,13,{stroke:INK,lw:1.2,fill:'#ffffff'});y+=28});
+  y+=8;P.text('Torque is in ft-lb. 30% and 70% are the first two rounds in star pattern, 100% is the full-torque round, then one more pass clockwise.',M,y+4,7.5,'R',MUT);
+  P.text('Reference only. Size, class and bolts are read from the drawing, so check them. Use your site or project torque spec when you have one.',M,y+15,7.5,'R',MUT)
+ }catch(e){}}
  if(L.some(x=>x.kind==='bolt')||S.bolt){try{
   const st=buDefaults(),calc=boltTorque(st.dia,st.k,st.ksi),site=parseFloat(st.site),fin=site>0?site:calc.T,lab=(BU_DIA.find(d=>d[0]===st.dia)||[0,''])[1],wr=wrench({kind:'bolt',desc:'STUD NUT',size:lab}),seq=BU_PAT[st.n]||BU_PAT[8],n=seq.length;
   P.newPage();y=M;P.text('FLANGE BOLT-UP GUIDE',M,y+8,16,'B',INK);P.rect(M,y+13,36,3,{fill:ACC});y+=30;
