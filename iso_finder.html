@@ -880,6 +880,8 @@ class MiniPDF{
  text(s,x,y,size,font,color){const F={R:'F1',B:'F2',M:'F3'}[font||'R'];this.cur.ops.push('BT /'+F+' '+size+' Tf '+this.col(color)+' rg '+x.toFixed(1)+' '+(this.H-y).toFixed(1)+' Td ('+this.esc(s)+') Tj ET')}
  rect(x,y,w,h,o){o=o||{};let op=[];if(o.fill)op.push(this.col(o.fill)+' rg');if(o.stroke)op.push(this.col(o.stroke)+' RG '+(o.lw||.8)+' w');op.push(x.toFixed(1)+' '+(this.H-y-h).toFixed(1)+' '+w.toFixed(1)+' '+h.toFixed(1)+' re '+(o.fill&&o.stroke?'B':o.fill?'f':'S'));this.cur.ops.push(op.join(' '))}
  line(x1,y1,x2,y2,color,lw){this.cur.ops.push(this.col(color)+' RG '+(lw||.8)+' w '+x1.toFixed(1)+' '+(this.H-y1).toFixed(1)+' m '+x2.toFixed(1)+' '+(this.H-y2).toFixed(1)+' l S')}
+ circle(cx,cy,r,o){o=o||{};const k=.5523*r,Y=this.H-cy,f=n=>n.toFixed(1);let op=[];if(o.fill)op.push(this.col(o.fill)+' rg');if(o.stroke)op.push(this.col(o.stroke)+' RG '+(o.lw||.8)+' w');
+  op.push(f(cx+r)+' '+f(Y)+' m '+f(cx+r)+' '+f(Y+k)+' '+f(cx+k)+' '+f(Y+r)+' '+f(cx)+' '+f(Y+r)+' c '+f(cx-k)+' '+f(Y+r)+' '+f(cx-r)+' '+f(Y+k)+' '+f(cx-r)+' '+f(Y)+' c '+f(cx-r)+' '+f(Y-k)+' '+f(cx-k)+' '+f(Y-r)+' '+f(cx)+' '+f(Y-r)+' c '+f(cx+k)+' '+f(Y-r)+' '+f(cx+r)+' '+f(Y-k)+' '+f(cx+r)+' '+f(Y)+' c '+(o.fill&&o.stroke?'B':o.fill?'f':'S'));this.cur.ops.push(op.join(' '))}
  image(bytes,pw,ph,x,y,w,h){this.imgs.push({bytes,pw,ph});const n=this.imgs.length;this.cur.imgs.add(n);this.cur.ops.push('q '+w.toFixed(1)+' 0 0 '+h.toFixed(1)+' '+x.toFixed(1)+' '+(this.H-y-h).toFixed(1)+' cm /Im'+n+' Do Q')}
  save(){const parts=[],off=[];let len=0;const enc=new TextEncoder();
   const push=u=>{const b=typeof u==='string'?enc.encode(u):u;parts.push(b);len+=b.length};
@@ -919,7 +921,8 @@ async function pageJpeg(mode){ // the drawing with the note markers (and the tra
 async function makePdf(){
  const P=new MiniPDF(),W=P.W,H=P.H,M=40,CW=W-2*M,INK='#0b1a25',MUT='#566774',LN='#d3dce4',ACC='#f26a1b';let y=0;
  const line=(S.list&&S.list.line)||'',wh=window.__WH,L=listItems();
- const header=()=>{P.rect(0,0,W,50,{fill:INK});P.text('Iso check sheet',M,32,17,'B','#ffffff');if(line){const t=pdfSafe(line),w=P.width(t,8.5,'R');P.text(t,W-M-Math.min(w,300),31,8.5,'R','#c7d5de')}y=72};
+ const header=()=>{P.rect(0,0,W,66,{fill:INK});P.rect(0,66,W,4,{fill:ACC});P.rect(M,18,6,32,{fill:ACC});P.text('ISO CHECK SHEET',M+16,38,22,'B','#ffffff');P.text('FIELD REFERENCE',M+16,52,8,'B',ACC);
+  if(line){const t=pdfSafe(line),w=Math.min(P.width(t,10,'B'),260);P.text('LINE',W-M-w,28,7,'B','#8fa3b0');P.text(t,W-M-w,44,10,'B','#ffffff')}y=96};
  const need=h=>{if(y+h>H-46){P.newPage();y=M}};
  header();
  if(wh){
@@ -947,19 +950,49 @@ async function makePdf(){
  }
  if(L.length){
   P.newPage();y=M;const done=L.filter(x=>x.done).length;
-  P.text('Check list',M,y+8,16,'B',INK);P.text(done+' of '+L.length+' checked',W-M-P.width(done+' of '+L.length+' checked',9,'R'),y+7,9,'R',MUT);y+=24;
-  KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;need(60);
-   P.rect(M,y,CW,19,{fill:'#e6ecf1'});P.text(name,M+8,y+13,10.5,'B',INK);const cnt=g.filter(x=>x.done).length+'/'+g.length;P.text(cnt,W-M-8-P.width(cnt,8,'R'),y+13,8,'R',MUT);y+=30;
+  P.text('CHECK LIST',M,y+8,16,'B',INK);P.rect(M,y+13,36,3,{fill:ACC});P.text(done+' of '+L.length+' checked',W-M-P.width(done+' of '+L.length+' checked',9,'R'),y+7,9,'R',MUT);y+=24;
+  let zi=0;KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;need(60);zi=0;
+   const kc=KCOL[k]||'#6b7280';P.rect(M,y,CW,22,{fill:'#eef2f5'});P.rect(M,y,6,22,{fill:kc});P.text(name.toUpperCase(),M+16,y+15,10.5,'B',INK);const cnt=g.filter(x=>x.done).length+'/'+g.length,cw=P.width(cnt,8.5,'B')+14;P.rect(W-M-cw-6,y+4,cw,14,{fill:kc});P.text(cnt,W-M-cw+1,y+14,8.5,'B','#ffffff');y+=36;
    if(hint){P.wrap(hint+(k==='bolt'&&wrenchSummary(g)?'  '+wrenchSummary(g):''),CW,8,'R').forEach(l=>{P.text(l,M+2,y,8,'R',MUT);y+=10});y+=8}
    g.forEach(x=>{const main=P.wrap(x.what||x.desc||'',330,9.5,'B'),sub=(x.what&&x.desc&&x.desc!==x.what?P.wrap(x.desc,330,8,'R').slice(0,2):[]).concat(wrenchLine(x)?[wrenchLine(x)]:[]),meta=P.wrap([x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('   '),104,8.5,'R'),
      rows=Math.max(main.length*12+sub.length*10,meta.length*11)+8;need(rows+2);
-     P.rect(M+2,y-9,11,11,{stroke:INK,lw:1});if(x.done){P.line(M+4,y-3,M+7,y,INK,1.4);P.line(M+7,y,M+12,y-8,INK,1.4)}
-     if(x.ref)P.text(String(x.ref).slice(0,9),M+20,y,8,'M',MUT);
+     if(zi++%2===0)P.rect(M,y-11,CW,rows,{fill:'#f6f8fa'});
+     P.rect(M+4,y-9,12,12,{stroke:INK,lw:1.2,fill:'#ffffff'});if(x.done){P.line(M+6,y-3,M+9.5,y,'#12a150',1.8);P.line(M+9.5,y,M+15,y-8,'#12a150',1.8)}
+     if(x.ref)P.text(String(x.ref).slice(0,9),M+24,y,8,'M',kc);
      let yy=y;main.forEach(l=>{P.text(l,M+78,yy,9.5,'B',INK);yy+=12});sub.forEach(l=>{P.text(l,M+78,yy,8,'R',MUT);yy+=10});
      meta.forEach((l,j)=>P.text(l,W-M-104,y+j*11,8.5,'R',INK));
-     y+=rows;P.line(M,y-8,W-M,y-8,'#e6ecf1',.6)});
+     y+=rows;});
    y+=8})}
- const n=P.pages.length;P.pages.forEach((pg,i)=>{P.cur=pg;P.text('Iso check sheet  -  page '+(i+1)+' of '+n,M,H-24,8,'R',MUT)});
+ if(L.some(x=>x.kind==='bolt')||S.bolt){try{
+  const st=buDefaults(),calc=boltTorque(st.dia,st.k,st.ksi),site=parseFloat(st.site),fin=site>0?site:calc.T,lab=(BU_DIA.find(d=>d[0]===st.dia)||[0,''])[1],wr=wrench({kind:'bolt',desc:'STUD NUT',size:lab}),seq=BU_PAT[st.n]||BU_PAT[8],n=seq.length;
+  P.newPage();y=M;P.text('FLANGE BOLT-UP GUIDE',M,y+8,16,'B',INK);P.rect(M,y+13,36,3,{fill:ACC});y+=30;
+  P.rect(M,y,CW,96,{fill:INK});P.rect(M,y,6,96,{fill:ACC});P.text('FINAL TORQUE',M+20,y+20,8.5,'B',ACC);P.text(fmtT(fin)+' ft-lb',M+20,y+58,40,'B','#ffffff');
+  const k2=(BU_K.find(q=>q[1]===st.k)||[''])[0];
+  const info=[lab+' bolts, '+st.n+' on the joint',site>0?'Torque from your site spec':'Calculated: '+calc.n+' threads per inch, K '+st.k.toFixed(2)+', '+st.ksi+' ksi',k2,wr?'Wrench: '+wr.size+' ('+wr.kind+')':''].filter(Boolean);
+  let iy=y+24;info.forEach(t=>{P.wrap(t,200,8.5,'R').forEach(l=>{P.text(l,W-M-210,iy,8.5,'R','#c7d5de');iy+=12})});y+=96+16;
+  P.text('TIGHTEN IN ROUNDS',M,y+4,10.5,'B',INK);y+=14;
+  [['1','Snug the nuts','Star pattern',.3],['2','Medium','Star pattern',.6],['3','Full torque','Star pattern',1],['4','Final pass','Clockwise, bolt by bolt, until the nuts stop turning',1]].forEach((r,i)=>{
+   P.rect(M,y,CW,26,{fill:i%2?'#ffffff':'#f6f8fa',stroke:LN,lw:.5});P.circle(M+16,y+13,9,{fill:ACC});P.text(r[0],M+13,y+17,10,'B','#ffffff');P.text(r[1],M+34,y+12,10,'B',INK);P.text(r[2],M+34,y+22,7.5,'R',MUT);
+   const t=fmtT(fin*r[3])+' ft-lb',tw=P.width(t,14,'B');P.text(t,W-M-10-tw,y+18,14,'B',INK);const pc=Math.round(r[3]*100)+'%',pw=P.width(pc,8,'B');P.text(pc,W-M-120-pw,y+16,8,'B',MUT);y+=26});
+  y+=18;P.text('STAR PATTERN FOR '+st.n+' BOLTS',M,y,10.5,'B',INK);y+=10;
+  const R0=96,cx=M+R0+16,cy=y+R0+14,pos=i=>{const a=(-90+(i-.5)*360/n)*Math.PI/180;return[cx+R0*.78*Math.cos(a),cy+R0*.78*Math.sin(a)]};
+  P.circle(cx,cy,R0,{fill:'#1b2a34',stroke:'#3a5262',lw:2});P.circle(cx,cy,R0*.45,{fill:'#0d151b',stroke:'#3a5262',lw:2});
+  for(let i=0;i<n-1;i++){const a=pos(seq[i]),b=pos(seq[i+1]);P.line(a[0],a[1],b[0],b[1],'#ff8240',.7)}
+  const rk={};seq.forEach((b,i)=>rk[b]=i);const rad=n>16?8:10;
+  for(let i=1;i<=n;i++){const p=pos(i),t=String(i);P.circle(p[0],p[1],rad,{fill:rk[i]===0?ACC:'#0d151b',stroke:rk[i]===0?'#ffffff':'#6b8798',lw:1.2});const fz=n>16?7:8.5;P.text(t,p[0]-P.width(t,fz,'B')/2,p[1]+fz*.36,fz,'B',rk[i]===0?'#1d0d02':'#e9f0f4')}
+  const sx=M+2*R0+44;let sy=y+8;
+  P.text('Order to tighten',sx,sy,10,'B',INK);sy+=14;
+  P.wrap(seq.join('  >  '),W-M-sx,9,'M').forEach(l=>{P.text(l,sx,sy,9,'M',INK);sy+=12});sy+=6;
+  P.wrap('Do this full order for every round. Bolt 1 is the orange one. Number the bolts around the flange, starting at the top and going clockwise.',W-M-sx,8.5,'R').forEach(l=>{P.text(l,sx,sy,8.5,'R',MUT);sy+=11});sy+=10;
+  P.text('Before you start',sx,sy,10,'B',INK);sy+=14;
+  ['Clean the flange faces and the threads','Right gasket, centered in the bore','Lube the threads and the nut faces','Flanges lined up, faces parallel','Use a calibrated torque wrench','Mark each nut when it is done'].forEach(t=>{P.rect(sx,sy-8,9,9,{stroke:INK,lw:1});P.wrap(t,W-M-sx-16,8.5,'R').forEach((l,j)=>{P.text(l,sx+15,sy+j*11,8.5,'R',INK)});sy+=14});
+  y=cy+R0+22;need(60);
+  P.rect(M,y,CW,44,{fill:'#fff4ec',stroke:ACC,lw:1});P.rect(M,y,6,44,{fill:ACC});P.text('REFERENCE ONLY',M+16,y+15,9,'B','#a84e07');
+  P.wrap('This torque is an estimate from the bolt size, thread lube and target stress. If your site, project or gasket maker gives a torque value, use that one. The right number changes with the gasket, the bolt material and the lube.',CW-30,8,'R').slice(0,3).forEach((l,j)=>P.text(l,M+16,y+26+j*9.5,8,'R',INK))
+ }catch(e){}}
+ const n=P.pages.length;P.pages.forEach((pg,i)=>{P.cur=pg;
+  if(i>0){P.rect(0,0,W,22,{fill:INK});P.rect(0,22,W,2,{fill:ACC});P.text('ISO CHECK SHEET',M,15,8.5,'B','#ffffff');if(line){const t=pdfSafe(line),w=Math.min(P.width(t,8,'R'),300);P.text(t,W-M-w,15,8,'R','#c7d5de')}}
+  P.line(M,H-34,W-M,H-34,ACC,1.2);P.text('Iso Finder  -  always check against the issued drawing',M,H-20,7.5,'R',MUT);const pt='Page '+(i+1)+' of '+n;P.text(pt,W-M-P.width(pt,8,'B'),H-20,8,'B',INK)});
  return P.save()}
 async function savePdf(btn){
  const old=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='Making the PDF...'}
