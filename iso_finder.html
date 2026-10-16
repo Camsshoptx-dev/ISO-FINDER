@@ -201,6 +201,19 @@ summary{font-weight:600}
 .me .tile.in{background:transparent;border-style:dashed}
 .me .ends{font-family:var(--mono);font-size:12px;color:var(--mut);margin:8px 0 4px;padding:0;list-style:none}.me .ends li{padding:4px 0;border-top:1px solid var(--ln2)}
 .wr{color:var(--acc);font-weight:700}
+.bu{background:var(--pn);border:1px solid var(--ln);border-radius:18px;padding:16px;margin:10px 0}
+.bu-t{font:800 24px "Barlow Semi Condensed",var(--disp),sans-serif;text-transform:uppercase;margin-bottom:8px}
+.bu-warn{background:rgba(255,130,64,.12);border:1px solid var(--acc);border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
+.bu-r{display:block;margin:10px 0}.bu-r span{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+.bu-r select,.bu-r input{width:100%;font:inherit;padding:11px 12px;border-radius:12px;border:1px solid var(--ln);background:var(--bg);color:var(--ink)}
+.bu-res{margin-top:14px}.bu-big{font:800 44px "Barlow Semi Condensed",sans-serif;color:var(--acc);line-height:1}
+.bu-sub{font-size:13.5px;color:var(--mut);margin-top:4px}
+.bu-tab{margin:12px 0}.bu-rd{display:grid;grid-template-columns:70px 1fr auto;gap:8px;padding:9px 0;border-top:1px solid var(--ln);align-items:center;font-size:14px}.bu-rd i{font-style:normal;font-weight:800;color:var(--acc);white-space:nowrap}
+.bu-h{font:800 18px "Barlow Semi Condensed",sans-serif;text-transform:uppercase;margin:16px 0 6px}
+.bu-pat{display:grid;gap:12px;justify-items:center}.bu-svg{width:min(260px,80%)}
+.bu-big2{font-weight:800;font-size:18px}.bu-nav{display:flex;gap:10px;margin-top:10px}.bu-nav button{flex:1}
+.bu-ul{margin:0 0 4px 18px;font-size:14px;color:var(--mut)}.bu-ul li{margin:4px 0}
+.nr{color:var(--pt)}
 </style>
 <header id="top">
   <div class="steps" role="tablist" aria-label="Steps">
@@ -777,6 +790,56 @@ function wrench(x){if(!x||x.kind!=='bolt')return null;const v=boltDia(x);if(v==n
  const dia=Object.keys(WR_HEAVY).map(Number).find(k=>Math.abs(k-key)<1e-4);return{size:w+'"',kind:reg?'regular hex':'heavy hex nut',dia:v}}
 function wrenchLine(x){const w=wrench(x);return w?'Wrench: '+w.size+'  ('+w.kind+')':''}
 function wrenchSummary(g){const seen={};g.forEach(x=>{const w=wrench(x);if(w)seen[w.size]=1});const k=Object.keys(seen);return k.length?'Wrenches you will need: '+k.join(', ')+'. Studs have a nut on each end, so bring two of the same size.':''}
+/* ---------- bolt-up guide: torque estimate and tightening pattern ---------- */
+const TPI={0.25:20,0.3125:18,0.375:16,0.4375:14,0.5:13,0.5625:12,0.625:11,0.75:10,0.875:9,1:8,1.125:8,1.25:8,1.375:8,1.5:8,1.625:8,1.75:8,1.875:8,2:8};
+const BU_DIA=[[.375,'3/8"'],[.4375,'7/16"'],[.5,'1/2"'],[.5625,'9/16"'],[.625,'5/8"'],[.75,'3/4"'],[.875,'7/8"'],[1,'1"'],[1.125,'1-1/8"'],[1.25,'1-1/4"'],[1.375,'1-3/8"'],[1.5,'1-1/2"'],[1.625,'1-5/8"'],[1.75,'1-3/4"'],[1.875,'1-7/8"'],[2,'2"']];
+const BU_K=[['Moly paste on threads and nut face',0.12],['Copper or nickel anti-seize',0.15],['Plain or dry (not recommended)',0.20]];
+const BU_STRESS=[[40,'40 ksi (softer gaskets)'],[50,'50 ksi (common default)'],[60,'60 ksi (high pressure, metal gaskets)']];
+const BU_PAT={4:[1,3,2,4],8:[1,5,3,7,2,6,4,8],12:[1,7,4,10,2,8,5,11,3,9,6,12],16:[1,9,5,13,3,11,7,15,2,10,6,14,4,12,8,16],20:[1,11,6,16,3,13,8,18,5,15,10,20,2,12,7,17,4,14,9,19],24:[1,13,7,19,4,16,10,22,2,14,8,20,5,17,11,23,3,15,9,21,6,18,12,24]};
+let BU_OPEN=false,BU_STEP=0;
+function boltTorque(D,K,ksi){const n=TPI[D]||8,As=Math.PI/4*Math.pow(D-0.9743/n,2),F=ksi*1000*As;return{n:n,As:As,F:F,T:K*D*F/12}}
+function fmtT(t){return t<20?t.toFixed(1):String(Math.round(t))}
+function buDefaults(){const b=S.bolt||{};const first=listItems().map(x=>wrench(x)).find(Boolean);
+ let dia=b.dia;if(!dia&&first){dia=BU_DIA.reduce((a,c)=>Math.abs(c[0]-first.dia)<Math.abs(a[0]-first.dia)?c:a)[0]}
+ return{dia:dia||.75,n:b.n||8,k:b.k||0.12,ksi:b.ksi||50,site:b.site||''}}
+function renderBolt(host){host.innerHTML='';const st=buDefaults();S.bolt=st;
+ const box=el('div','bu');
+ box.append(el('div','bu-t','Flange bolt-up guide'));
+ box.append(el('div','bu-warn','Reference only. If your site or the project gives a torque value, use that one and type it in below. The right torque depends on the lubricant, the gasket and the bolt material. Use a calibrated torque wrench.'));
+ const row=(lab,node)=>{const r=el('label','bu-r');r.append(el('span',null,lab),node);return r};
+ const sel=(opts,cur,fn)=>{const s=document.createElement('select');opts.forEach(o=>{const op=document.createElement('option');op.value=o[0];op.textContent=o[1];if(+o[0]===+cur)op.selected=true;s.append(op)});s.onchange=()=>fn(+s.value);return s};
+ const upd=()=>{save();renderBolt(host)};
+ box.append(row('Bolt diameter',sel(BU_DIA,st.dia,v=>{st.dia=v;upd()})));
+ box.append(row('Number of bolts on the joint (count the holes)',sel(Object.keys(BU_PAT).map(k=>[+k,k+' bolts']),st.n,v=>{st.n=v;BU_STEP=0;upd()})));
+ box.append(row('Thread lubricant',sel(BU_K.map(k=>[k[1],k[0]]),st.k,v=>{st.k=v;upd()})));
+ box.append(row('Target bolt stress',sel(BU_STRESS,st.ksi,v=>{st.ksi=v;upd()})));
+ const si=document.createElement('input');si.type='number';si.inputMode='decimal';si.placeholder='optional, ft-lb';si.value=st.site;si.onchange=()=>{st.site=si.value;upd()};
+ box.append(row('Torque from your site or project spec (ft-lb)',si));
+ const calc=boltTorque(st.dia,st.k,st.ksi),site=parseFloat(st.site),fin=site>0?site:calc.T,lab=(BU_DIA.find(d=>d[0]===st.dia)||[0,''])[1];
+ const res=el('div','bu-res');res.append(el('div','bu-big',fmtT(fin)+' ft-lb'),el('div','bu-sub',site>0?'Final torque: your site spec':'Final torque: calculated estimate for '+lab+' bolts, '+calc.n+' threads per inch, K '+st.k.toFixed(2)+', '+st.ksi+' ksi'));
+ box.append(res);
+ const w=wrench({kind:'bolt',desc:'STUD NUT',size:lab});if(w)box.append(el('div','bu-sub wr','Wrench: '+w.size+' ('+w.kind+')'));
+ const rounds=[['Round 1','Snug, in the star pattern',.3],['Round 2','Star pattern',.6],['Round 3','Full torque, star pattern',1],['Round 4','Full torque, go around clockwise bolt by bolt until the nuts stop turning',1]];
+ const tb=el('div','bu-tab');rounds.forEach(r=>{const d=el('div','bu-rd');d.append(el('b',null,r[0]),el('span',null,r[1]),el('i',null,fmtT(fin*r[2])+' ft-lb'));tb.append(d)});box.append(tb);
+ /* pattern */
+ const seq=BU_PAT[st.n],n=st.n;if(BU_STEP>=seq.length)BU_STEP=seq.length-1;
+ const pos=i=>{const a=(-90+(i-.5)*360/n)*Math.PI/180;return[130+92*Math.cos(a),130+92*Math.sin(a)]};
+ let svg='<svg viewBox="0 0 260 260" class="bu-svg" role="img" aria-label="Bolt tightening order"><circle cx="130" cy="130" r="118" fill="#1b2a34" stroke="#3a5262" stroke-width="3"/><circle cx="130" cy="130" r="52" fill="#0d151b" stroke="#3a5262" stroke-width="3"/>';
+ if(BU_STEP>0){const a=pos(seq[BU_STEP-1]),b=pos(seq[BU_STEP]);svg+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="#ff8240" stroke-width="3" stroke-dasharray="6 5"/>'}
+ const rank={};seq.forEach((b,i)=>rank[b]=i);
+ for(let i=1;i<=n;i++){const p=pos(i),r=rank[i],cur=r===BU_STEP,done=r<BU_STEP,fs=n>16?11:13,rad=n>16?12:15;
+  svg+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(cur?rad+4:rad)+'" fill="'+(cur?'#ff8240':done?'#2f7d46':'#0d151b')+'" stroke="'+(cur?'#fff':done?'#5fd07a':'#6b8798')+'" stroke-width="'+(cur?3:2)+'"/><text x="'+p[0]+'" y="'+(p[1]+4.5)+'" text-anchor="middle" font-size="'+fs+'" font-weight="800" fill="'+(cur?'#1d0d02':'#e9f0f4')+'">'+i+'</text>'}
+ svg+='</svg>';
+ const pw=el('div','bu-pat');pw.innerHTML=svg;
+ const info=el('div','bu-step');info.append(el('div','bu-big2','Step '+(BU_STEP+1)+' of '+seq.length+': tighten bolt '+seq[BU_STEP]),el('div','bu-sub','Order: '+seq.join(' > ')+'. Do the whole order for each round.'));
+ const nav=el('div','bu-nav');const bk=el('button','ghost','Back'),nx=el('button',null,BU_STEP<seq.length-1?'Next bolt':'Start over');
+ bk.onclick=()=>{BU_STEP=Math.max(0,BU_STEP-1);renderBolt(host)};nx.onclick=()=>{BU_STEP=BU_STEP<seq.length-1?BU_STEP+1:0;renderBolt(host)};nav.append(bk,nx);info.append(nav);pw.append(info);
+ box.append(el('div','bu-h','Tightening order (opposite bolts, criss-cross)'),pw);
+ box.append(el('div','bu-h','Before you start'));
+ const ul=el('ul','bu-ul');['Clean both flange faces and check the gasket is the right type and centered.','Lubricate the threads and the face of each nut that turns.','Pull the flanges together evenly. The gap should be the same all the way around.','Run every nut on by hand with the same amount of thread showing.','Number the bolts with a paint marker so you can follow the order.','After the last round, check each nut once more. Nothing should turn.'].forEach(t=>ul.append(el('li',null,t)));box.append(ul);
+ host.append(box)}
+function nearNote(it){if(it.u==null||it.v==null)return'';let best=null,bd=1e18;(S.notes||[]).forEach(n=>{if(n.u==null||n.v==null)return;const d=Math.hypot(n.u-it.u,n.v-it.v);if(d<bd){bd=d;best=n}});
+ if(!best)return'';const p=[best.N&&'N '+best.N,best.E&&'E '+best.E,best.Z&&'EL '+best.Z].filter(Boolean).join(', ');return p?'Nearest printed coordinate: '+p:''}
 function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('#dock').scrollTop;c.innerHTML='';const L=listItems(),done=L.filter(x=>x.done).length;
  if(!L.length){const w=el('div','wt');w.append(el('p',null,readCtl?'Reading the lists on the sheet…':'No list yet. Claude reads the material list, cut pipe lengths, welds and supports from the sheet so you can check them off while you walk the line.'));
   if(sampleFn&&img&&!readCtl){const b=el('button','pri','Read the lists from this photo');b.onclick=readListOnly;w.append(b)}
@@ -789,14 +852,14 @@ function renderCheck(){const c=$('#checkbody');if(!c)return;const keepScroll=$('
   const hb=el('button',S.hideDone?'on':'',S.hideDone?'Show checked':'Hide checked');hb.onclick=()=>{S.hideDone=!S.hideDone;save();renderCheck()};
   const cb=el('button',null,'Copy what is left');cb.onclick=async()=>{const t=remainingText();let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){try{const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.append(a);a.select();ok=document.execCommand('copy');a.remove()}catch(e2){}}cb.textContent=ok?'Copied':'Could not copy';setTimeout(()=>cb.textContent='Copy what is left',1800)};
   const rb=el('button',null,'Clear checks');rb.onclick=()=>{if(rb.dataset.arm){L.forEach(x=>x.done=false);save();renderCheck()}else{rb.dataset.arm=1;rb.textContent='Tap again to clear';setTimeout(()=>{rb.dataset.arm='';rb.textContent='Clear checks'},2500)}};
-  tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);
+  tl.append(hb,cb,rb);c.append(tl);const pb=el('button','ghost','Save PDF to print');pb.style.marginTop='4px';pb.onclick=()=>savePdf(pb);c.append(pb);const bb=el('button','ghost','Bolt-up guide: torque and pattern');bb.style.marginTop='8px';const bh=el('div');bb.onclick=()=>{BU_OPEN=!BU_OPEN;bh.innerHTML='';if(BU_OPEN)renderBolt(bh)};c.append(bb,bh);if(BU_OPEN)renderBolt(bh);
   KINDS.forEach(([k,name,hint])=>{const g=L.filter(x=>x.kind===k);if(!g.length)return;const gd=g.filter(x=>x.done).length;
    const vis=S.hideDone?g.filter(x=>!x.done):g;if(!vis.length)return;
    const d=el('details');d.open=true;const sm=el('summary');sm.append(document.createTextNode(name));sm.append(el('span','n',gd+'/'+g.length));d.append(sm);if(hint)d.append(el('p','gh',hint));if(k==='bolt'){const ws=wrenchSummary(g);if(ws)d.append(el('p','gh wr',ws))}
    vis.forEach(x=>{const row=el('label','ci'+(x.done?' done':''));const cbx=document.createElement('input');cbx.type='checkbox';cbx.checked=x.done;cbx.setAttribute('aria-label',[x.ref,x.desc].filter(Boolean).join(' '));
     cbx.onchange=()=>{x.done=cbx.checked;row.classList.toggle('done',x.done);save();const n=L.filter(y=>y.done).length;hd.firstChild.textContent=n+' of '+L.length+' checked';bar.style.width=Math.round(n/L.length*100)+'%';sm.querySelector('.n').textContent=g.filter(y=>y.done).length+'/'+g.length;update2();if(S.hideDone)setTimeout(renderCheck,350)};
     const t=el('div');const ct=el('div','ct');if(x.ref)ct.append(el('b',null,x.ref));ct.append(document.createTextNode(x.what||x.desc||''));t.append(ct);
-    const meta=[x.what&&x.desc&&x.desc!==x.what?x.desc:'',x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('  ·  ');if(meta)t.append(el('div','cm',meta));const wl=wrenchLine(x);if(wl)t.append(el('div','cm wr',wl));
+    const meta=[x.what&&x.desc&&x.desc!==x.what?x.desc:'',x.size,x.qty?'qty '+x.qty:''].filter(Boolean).join('  ·  ');if(meta)t.append(el('div','cm',meta));const wl=wrenchLine(x);if(wl)t.append(el('div','cm wr',wl));const nl=(x.kind==='bolt')?'':nearNote(x);if(nl)t.append(el('div','cm nr',nl));
     row.append(cbx,t);d.append(row)});
    c.append(d)})}
  const f=el('form','addrow');const inp=document.createElement('input');inp.placeholder='Add something that is missing';inp.setAttribute('aria-label','Add an item');const ab=el('button',null,'Add');ab.type='submit';f.append(inp,ab);
